@@ -1,19 +1,7 @@
 import * as React from "react";
-import {
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  LifeBuoy,
-  Map,
-  PieChart,
-  Send,
-  Settings2,
-  SquareTerminal,
-} from "lucide-react";
+import { Bot, Command, LifeBuoy, Send } from "lucide-react";
 
 import { NavMain } from "@/components/side-bar/nav-main";
-import { NavProjects } from "@/components/side-bar/nav-projects";
 import { NavSecondary } from "@/components/side-bar/nav-secondary";
 import { NavUser } from "@/components/side-bar/nav-user";
 import {
@@ -26,33 +14,13 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { UserSlice } from "@/redux/slices";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
 const data = {
   navMain: [
     {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
+      title: "Generate Images",
+      url: "generate-image",
       icon: Bot,
       items: [
         {
@@ -65,52 +33,6 @@ const data = {
         },
         {
           title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
           url: "#",
         },
       ],
@@ -128,32 +50,13 @@ const data = {
       icon: Send,
     },
   ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
 };
 
 export function AppSidebar({ ...props }) {
   const { userInfo } = useSelector((state) => state["feature/user"]);
-
+  const dispatch = useDispatch();
   const handleLogout = () => {
-    dispatch(
-      UserSlice.actions.logout({ redirectPath: window.location.pathname })
-    );
+    dispatch(UserSlice.actions.logout({}));
   };
   return (
     <Sidebar variant="inset" {...props}>
@@ -178,7 +81,6 @@ export function AppSidebar({ ...props }) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

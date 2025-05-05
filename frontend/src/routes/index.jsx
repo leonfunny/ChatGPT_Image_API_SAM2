@@ -6,6 +6,7 @@ import { RouteName } from "./routeName";
 import SideBar from "@/components/side-bar/index";
 
 const LoginPage = lazy(() => import("@/pages/login"));
+const GenerateImagePage = lazy(() => import("@/pages/generate-image"));
 
 const MainRouter = () => {
   return (
@@ -13,7 +14,13 @@ const MainRouter = () => {
       <Routes>
         <Route element={<LoginPage />} path={RouteName.LOGIN} />
         <Route path="/" element={<RouteGuard />}>
-          <Route path="/" element={<SideBar />}></Route>
+          <Route path="/" element={<SideBar />}>
+            <Route
+              element={<GenerateImagePage />}
+              path={RouteName.GENERATE_IMAGE}
+              index
+            />
+          </Route>
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

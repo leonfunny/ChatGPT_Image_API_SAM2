@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import globals from "globals";
+import reactPlugin from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 
@@ -17,12 +18,13 @@ export default [
       },
     },
     plugins: {
+      react: reactPlugin,
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
     },
     rules: {
       ...js.configs.recommended.rules,
-      ...react.configs.recommended.rules,
+      ...reactPlugin.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       "react/jsx-no-target-blank": "off",
       "react-refresh/only-export-components": [
@@ -40,7 +42,6 @@ export default [
       "react/no-danger-with-children": "error",
       "react/no-unstable-nested-components": ["error", { allowAsProps: true }],
       "react/jsx-fragments": "error",
-      "react/jsx-no-leaked-render": ["error", { validStrategies: ["ternary"] }],
       "react/jsx-key": [
         "error",
         {

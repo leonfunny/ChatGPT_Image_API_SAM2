@@ -11,10 +11,13 @@ dependencies = [
     "dotenv>=0.9.9",
     "fastapi>=0.115.12",
     "greenlet>=3.2.1",
+    "openai>=1.77.0",
     "passlib>=1.7.4",
     "pydantic>=2.11.4",
     "pydantic-settings>=2.9.1",
     "python-jose[cryptography]>=3.4.0",
+    "python-multipart>=0.0.20",
+    "requests>=2.32.3",
     "sqlalchemy>=2.0.40",
     "uvicorn>=0.34.2",
 ]

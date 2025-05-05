@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "AKSKASLKDJASKDJNZXCZNASJDKASDNZXC"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
 
     class Config:
         env_file = os.path.join(BASE_DIR, ".env")  # Path to the .env file
