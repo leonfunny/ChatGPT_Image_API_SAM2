@@ -1,7 +1,7 @@
 import RouteGuard from "@/helpers/RouteGuard";
 import NotFoundPage from "@/pages/not-found";
 import { lazy } from "react";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router";
 import { RouteName } from "./routeName";
 import SideBar from "@/components/side-bar/index";
 
@@ -12,16 +12,22 @@ const MainRouter = () => {
   return (
     <BrowserRouter>
       <Routes>
+        <Route
+          path="/"
+          element={<Navigate to={RouteName.GENERATE_IMAGE} replace />}
+        />
+
         <Route element={<LoginPage />} path={RouteName.LOGIN} />
-        <Route path="/" element={<RouteGuard />}>
-          <Route path="/" element={<SideBar />}>
+
+        <Route element={<RouteGuard />}>
+          <Route element={<SideBar />}>
             <Route
               element={<GenerateImagePage />}
               path={RouteName.GENERATE_IMAGE}
-              index
             />
           </Route>
         </Route>
+
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

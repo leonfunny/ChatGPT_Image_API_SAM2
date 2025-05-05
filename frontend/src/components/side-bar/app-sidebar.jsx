@@ -22,20 +22,6 @@ const data = {
       title: "Generate Images",
       url: "generate-image",
       icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
     },
   ],
   navSecondary: [

@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     APP_HOST: str = os.getenv("APP_HOST")
     APP_PORT: int = os.getenv("APP_PORT")
     API_PREFIX: str = os.getenv("API_PREFIX")
-    DB_NAME: str = os.getenv("DB_NAME")
     DB_HOST: str = os.getenv("DB_HOST")
     DB_PORT: str = os.getenv("DB_PORT")
     DB_DATABASE: str = os.getenv("DB_DATABASE")

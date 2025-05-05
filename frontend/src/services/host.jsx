@@ -3,4 +3,7 @@ export const HOST = {
   login: "auth/token",
   refresh: "auth/refresh-token",
   register: "auth/register",
+  generate: "generate",
+  editImage: "generate/edit",
+  batchEditImage: "generate/batch-edit",
 };

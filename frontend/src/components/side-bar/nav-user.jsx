@@ -10,7 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ChevronsUpDown } from "lucide-react";
 
 export function NavUser({ user, onLogout }) {
-  console.log(user);
   return (
     <div className="">
       <hr className="mb-2" />

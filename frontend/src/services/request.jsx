@@ -89,8 +89,8 @@ Request.interceptors.response.use(
           return Promise.reject(response);
         } catch (error) {
           if (error?.response?.status === 401) {
+            return Promise.reject(error);
           }
-          return Promise.reject(error);
         }
       }
     }
