@@ -8,7 +8,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from core.config import settings
 from core.database import Database
 
-from api.v1.api import router
+from api.v1.api import router, secure_router
 
 from helpers.execption import setup_exception_handlers
 from helpers.middleware import RequestIDMiddleware
@@ -38,6 +38,7 @@ def init_application():
         allow_headers=["*"],
     )
     app.include_router(router, prefix=f"/{settings.API_PREFIX}")
+    app.include_router(secure_router, prefix=f"/{settings.API_PREFIX}")
     app.add_middleware(GZipMiddleware)
     setup_exception_handlers(app)
 

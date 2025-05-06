@@ -6,7 +6,7 @@ import { HOST } from "./host";
 const BASE_API_URL = import.meta.env.VITE_BASE_API_URL;
 const Request = axios.create({
   baseURL: BASE_API_URL,
-  timeout: 60000,
+  timeout: 600000,
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
