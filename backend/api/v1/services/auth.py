@@ -53,7 +53,6 @@ async def get_current_user(
     )
     try:
         email = verify_token(token)
-        print(email)
         if email is None:
             raise credentials_exception
     except Exception:

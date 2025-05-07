@@ -53,8 +53,7 @@ function GenerateImagePage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(null);
   const [editMode, setEditMode] = useState("single");
   const [imageCollection, setImageCollection] = useState([]);
-  console.log(resultImage);
-  // Define model-specific options
+
   const modelOptions = {
     "gpt-image-1": {
       sizes: [
@@ -225,11 +224,9 @@ function GenerateImagePage() {
       return generate(imageData);
     },
     onSuccess: (response) => {
-      if (response.data && response.data.image_data) {
-        const format = response.data.format || "png";
-        const imageUrl = `data:image/${format};base64,${response.data.image_data}`;
-        setResultImage(imageUrl);
-        addToCollection(imageUrl, "generated");
+      if (response && response.image_url) {
+        setResultImage(response.image_url);
+        addToCollection(response.image_url, "generated");
       }
     },
     onError: (error) => {
@@ -262,11 +259,9 @@ function GenerateImagePage() {
       return editImage(formData);
     },
     onSuccess: (response) => {
-      if (response && response.image_data) {
-        const format = response.format || "png";
-        const imageUrl = `data:image/${format};base64,${response.image_data}`;
-        setResultImage(imageUrl);
-        addToCollection(imageUrl, "edited");
+      if (response && response.image_url) {
+        setResultImage(response.image_url);
+        addToCollection(response.image_url, "edited");
       }
     },
     onError: (error) => {
@@ -300,24 +295,15 @@ function GenerateImagePage() {
       return batchEditImage(formData);
     },
     onSuccess: (response) => {
-      if (
-        response.data &&
-        response.data.results &&
-        response.data.results.length > 0
-      ) {
-        const results = response.data.results;
+      if (response && response.results && response.results.length > 0) {
+        const results = response.results;
 
         results.forEach((result) => {
-          const format = result.format || "png";
-          const imageUrl = `data:image/${format};base64,${result.image_data}`;
-          addToCollection(imageUrl, "batch-edited");
+          addToCollection(result.image_url, "batch-edited");
         });
 
-        if (results.length > 0) {
-          const lastResult = results[results.length - 1];
-          const format = lastResult.format || "png";
-          const imageUrl = `data:image/${format};base64,${lastResult.image_data}`;
-          setResultImage(imageUrl);
+        if (results[0]) {
+          setResultImage(results[0].image_url);
         }
       }
     },
@@ -388,12 +374,21 @@ function GenerateImagePage() {
 
   const handleDownload = () => {
     if (resultImage) {
-      const link = document.createElement("a");
-      link.href = resultImage;
-      link.download = "generated-image.png";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      fetch(resultImage)
+        .then((response) => response.blob())
+        .then((blob) => {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `generated-image-${Date.now()}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        })
+        .catch(() => {
+          setError("Failed to download the image.");
+        });
     }
   };
 

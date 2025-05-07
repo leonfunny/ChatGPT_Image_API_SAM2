@@ -10,6 +10,7 @@ dependencies = [
     "bcrypt>=4.3.0",
     "dotenv>=0.9.9",
     "fastapi>=0.115.12",
+    "google-cloud-storage>=3.1.0",
     "greenlet>=3.2.1",
     "openai>=1.77.0",
     "passlib>=1.7.4",

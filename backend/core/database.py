@@ -75,36 +75,10 @@ async def get_db():
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
-class UUIDBinary(TypeDecorator):
-    """Custom type to store UUID as BINARY(16) in MySQL."""
-
-    impl = BINARY(16)
-
-    def process_bind_param(
-        self, value: Optional[uuid.UUID], dialect
-    ) -> Optional[bytes]:
-        if value is None:
-            return None
-        if isinstance(value, uuid.UUID):
-            return value.bytes
-        return uuid.UUID(value).bytes
-
-    def process_result_value(
-        self, value: Optional[bytes], dialect
-    ) -> Optional[uuid.UUID]:
-        if value is None:
-            return None
-        return uuid.UUID(bytes=value)
-
-
 class Base(DeclarativeBase, AsyncAttrs):
     """Base class for all ORM models."""
 
     metadata = metadata
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUIDBinary, primary_key=True, default=uuid.uuid4
-    )
 
     created_at: Mapped[datetime] = mapped_column(
         DATETIME(timezone=True), server_default=text("CURRENT_TIMESTAMP")

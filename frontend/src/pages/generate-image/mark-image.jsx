@@ -18,7 +18,6 @@ const MarkEditor = ({
   const isDrawing = useRef(false);
   const fileInputRef = useRef(null);
 
-  // Effect for when image changes or initialImage is provided
   useEffect(() => {
     const imgToUse = initialImage || image;
     if (imgToUse) {
@@ -27,22 +26,17 @@ const MarkEditor = ({
       const img = new Image();
 
       img.onload = () => {
-        // Set canvas dimensions to match image
         canvas.width = img.width;
         canvas.height = img.height;
-
-        // Draw image on canvas
-        ctx.drawImage(img, 0, 0);
-
-        // Set up drawing context
+        canvas.setAttribute("data-original-width", img.width);
+        canvas.setAttribute("data-original-height", img.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         ctx.lineWidth = brushSize;
         ctx.strokeStyle = "white";
         ctx.lineCap = "round";
         ctxRef.current = ctx;
 
-        // If it's a new image, notify parent component
         if (!initialImage && image) {
-          // Convert canvas to blob and create File object
           canvas.toBlob((blob) => {
             const file = new File([blob], "original-image.png", {
               type: "image/png",
@@ -57,13 +51,10 @@ const MarkEditor = ({
       };
 
       if (typeof imgToUse === "string") {
-        // If it's a string URL or data URL
         img.src = imgToUse;
       } else if (imgToUse instanceof File) {
-        // If it's a File object
         img.src = URL.createObjectURL(imgToUse);
       } else if (imgToUse && imgToUse.preview) {
-        // If it has a preview property
         img.src = imgToUse.preview;
       }
     }
@@ -110,35 +101,37 @@ const MarkEditor = ({
     }
   };
 
-  // Fixed function to get the correct coordinates based on canvas scaling
+  // Improved function to get the correct coordinates based on canvas scaling
   const getCanvasCoordinates = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
 
-    // Calculate the scaling factors between the canvas internal dimensions
-    // and its displayed dimensions
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const originalWidth = parseInt(
+      canvas.getAttribute("data-original-width") || canvas.width
+    );
+    const originalHeight = parseInt(
+      canvas.getAttribute("data-original-height") || canvas.height
+    );
 
-    // Calculate mouse position relative to the canvas element
-    let x, y;
+    const scaleX = originalWidth / rect.width;
+    const scaleY = originalHeight / rect.height;
 
-    // For mouse events
+    let clientX, clientY;
+
     if (e.nativeEvent) {
-      x = e.nativeEvent.clientX - rect.left;
-      y = e.nativeEvent.clientY - rect.top;
-    }
-    // For touch events
-    else if (e.touches && e.touches[0]) {
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
+      clientX = e.nativeEvent.clientX;
+      clientY = e.nativeEvent.clientY;
+    } else if (e.touches && e.touches[0]) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      return { x: 0, y: 0 };
     }
 
-    // Apply scaling to get the actual canvas coordinate
-    return {
-      x: x * scaleX,
-      y: y * scaleY,
-    };
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+
+    return { x, y };
   };
 
   const handleMouseDown = (e) => {
@@ -164,14 +157,13 @@ const MarkEditor = ({
     isDrawing.current = false;
   };
 
-  // Add touch event handlers for mobile support
   const handleTouchStart = (e) => {
-    e.preventDefault(); // Prevent scrolling when drawing
+    e.preventDefault();
     handleMouseDown(e);
   };
 
   const handleTouchMove = (e) => {
-    e.preventDefault(); // Prevent scrolling when drawing
+    e.preventDefault();
     handleMouseMove(e);
   };
 
@@ -190,15 +182,13 @@ const MarkEditor = ({
       const g = data[i + 1];
       const b = data[i + 2];
 
-      // Make white (and near-white) areas transparent
       if (r > 240 && g > 240 && b > 240) {
-        data[i + 3] = 0; // Set alpha to transparent
+        data[i + 3] = 0;
       }
     }
 
     ctx.putImageData(imageData, 0, 0);
 
-    // Convert canvas to blob and create File object
     canvas.toBlob((blob) => {
       const file = new File([blob], "mask-image.png", { type: "image/png" });
       onMaskCreated &&
@@ -206,10 +196,42 @@ const MarkEditor = ({
           file,
           preview: URL.createObjectURL(blob),
         });
-      // Turn off editing mode after saving
       setIsEditing(false);
     }, "image/png");
   };
+
+  // Helper function to properly resize the canvas when window size changes
+  const resizeCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || (!image && !initialImage)) return;
+
+    const originalWidth = parseInt(canvas.getAttribute("data-original-width"));
+    const originalHeight = parseInt(
+      canvas.getAttribute("data-original-height")
+    );
+
+    if (!originalWidth || !originalHeight) return;
+
+    const containerWidth = canvas.parentElement.clientWidth;
+    const scale = Math.min(1, containerWidth / originalWidth);
+    canvas.style.width = `${originalWidth * scale}px`;
+    canvas.style.height = `${originalHeight * scale}px`;
+  };
+
+  // Add a resize event listener
+  useEffect(() => {
+    window.addEventListener("resize", resizeCanvas);
+    return () => {
+      window.removeEventListener("resize", resizeCanvas);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (image || initialImage) {
+      const timeout = setTimeout(resizeCanvas, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [image, initialImage]);
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -293,12 +315,23 @@ const MarkEditor = ({
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
-                  className="max-w-full mx-auto"
+                  className="max-w-full max-h-full mx-auto"
                   style={{
-                    cursor: isEditing ? "crosshair" : "default",
-                    maxHeight: "400px",
-                    width: "100%",
+                    cursor: isEditing
+                      ? `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="${
+                          brushSize / 1.5
+                        }" height="${brushSize / 1.5}" viewBox="0 0 ${
+                          brushSize / 1.5
+                        } ${brushSize / 1.5}"><circle cx="${
+                          brushSize / 3
+                        }" cy="${brushSize / 3}" r="${
+                          brushSize / 3 - 1
+                        }" fill="%23FFF" stroke="%23000" stroke-width="1"></circle></svg>') ${
+                          brushSize / 3
+                        } ${brushSize / 3}, auto`
+                      : "default",
                     height: "auto",
+                    width: "auto",
                     objectFit: "contain",
                   }}
                 />
