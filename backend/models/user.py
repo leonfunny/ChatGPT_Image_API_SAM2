@@ -1,13 +1,14 @@
-from typing import List, Optional, Text
+from typing import List, Optional
 from core.database import Base
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class User(Base):
     __tablename__ = "users"
 
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     first_name: Mapped[str] = mapped_column(String(255), nullable=False)
     last_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -27,10 +28,8 @@ class Image(Base):
     original_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
-    width: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    height: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     format: Mapped[str] = mapped_column(String(10), nullable=False)
-    prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    prompt: Mapped[Optional[str]] = mapped_column(String(10000), nullable=True)
     model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="images")

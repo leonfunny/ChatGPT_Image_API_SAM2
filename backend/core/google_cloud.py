@@ -28,7 +28,7 @@ class ImageStorage:
     async def upload_image(
         self,
         file: UploadFile,
-        folder: str = "images",
+        folder: str = "images_generated",
         custom_filename: Optional[str] = None,
     ) -> Dict:
         """
@@ -44,7 +44,7 @@ class ImageStorage:
         """
         if not file.content_type.startswith("image/"):
             raise ValueError("Chỉ cho phép upload file ảnh")
-
+    
         if custom_filename:
             filename = custom_filename
         else:
@@ -57,10 +57,10 @@ class ImageStorage:
 
         blob = self.bucket.blob(full_path)
         content = await file.read()
+
         blob.upload_from_string(
             content,
             content_type=file.content_type,
-            predefined_acl="publicRead",
         )
 
         return {

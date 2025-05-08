@@ -24,7 +24,3 @@ class EditImageRequest(GeneralModel):
 class ImageResponse(GeneralModel):
     image_url: str
     format: str
-
-
-class BatchEditImageResponse(GeneralModel):
-    results: List[ImageResponse]

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+    GCS_BUCKET_NAME: str = os.getenv("GCS_BUCKET_NAME")
+    GCS_CREDENTIALS_PATH: str = os.getenv("GCS_CREDENTIALS_PATH")
 
     class Config:
         env_file = os.path.join(BASE_DIR, ".env")  # Path to the .env file
