@@ -1,5 +1,4 @@
-import * as React from "react";
-import { Bot, Command, LifeBuoy, Send } from "lucide-react";
+import { Bot, Command, LifeBuoy, Send, PaintbrushVertical } from "lucide-react";
 
 import { NavMain } from "@/components/side-bar/nav-main";
 import { NavSecondary } from "@/components/side-bar/nav-secondary";
@@ -22,6 +21,13 @@ const data = {
       title: "Generate Images",
       url: "generate-image",
       icon: Bot,
+      items: [
+        {
+          icon: PaintbrushVertical,
+          title: "Created",
+          url: "history",
+        },
+      ],
     },
   ],
   navSecondary: [

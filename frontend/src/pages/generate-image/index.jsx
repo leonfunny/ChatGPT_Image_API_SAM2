@@ -1,4 +1,3 @@
-/* eslint-disable react/no-unknown-property */
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,9 +29,10 @@ import {
   Image as ImageIcon,
   Loader2,
   Download,
-  PenLine,
   Edit,
   AlertTriangle,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import SingleImageUpload from "./single-upload";
@@ -53,6 +53,8 @@ function GenerateImagePage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(null);
   const [editMode, setEditMode] = useState("single");
   const [imageCollection, setImageCollection] = useState([]);
+  const [promptHistory, setPromptHistory] = useState([]);
+  const [activeView, setActiveView] = useState("images");
 
   const modelOptions = {
     "gpt-image-1": {
@@ -73,60 +75,12 @@ function GenerateImagePage() {
         { value: "auto", label: "Auto (Default)" },
       ],
     },
-    "dall-e-2": {
-      sizes: [
-        { value: "256x256", label: "Small (256×256)", icon: Square },
-        { value: "512x512", label: "Medium (512×512)", icon: Square },
-        { value: "1024x1024", label: "Large (1024×1024)", icon: Square },
-      ],
-      qualities: [{ value: "standard", label: "Standard (Default)" }],
-    },
-    "dall-e-3": {
-      sizes: [
-        { value: "1024x1024", label: "Square (1024×1024)", icon: Square },
-        { value: "1024x1792", label: "Portrait (1024×1792)", icon: SquareUser },
-        {
-          value: "1792x1024",
-          label: "Landscape (1792×1024)",
-          icon: RectangleHorizontal,
-        },
-        { value: "auto", label: "Auto (Default)", icon: Settings },
-      ],
-      qualities: [
-        { value: "standard", label: "Standard (Default)" },
-        { value: "hd", label: "HD" },
-      ],
-    },
   };
 
-  // Update size and quality when model changes
   useEffect(() => {
-    // Set default size for the selected model
-    const defaultSize = model === "dall-e-2" ? "1024x1024" : "1024x1024";
-    setImageSize(defaultSize);
-
-    // Set default quality for the selected model
-    const defaultQuality = model === "gpt-image-1" ? "auto" : "standard";
-    setQuality(defaultQuality);
-
-    // Reset edit mode to "single" and clear images when DALL-E 3 is selected
-    if (model === "dall-e-3") {
-      setEditMode("single");
-      if (mainImage?.preview) {
-        URL.revokeObjectURL(mainImage.preview);
-      }
-      setMainImage(null);
-      setMaskImage(null);
-      setUploadedImages([]);
-      setError(null);
-    }
-
-    // Show notification for DALL-E 2
-    if (model === "dall-e-2") {
-      setError("Dall-e-2 only support Edit image Inpainting");
-    } else {
-      setError(null);
-    }
+    setImageSize("1024x1024");
+    setQuality("auto");
+    setError(null);
   }, [model]);
 
   const addToCollection = (imageUrl, imageType = "generated") => {
@@ -135,8 +89,23 @@ function GenerateImagePage() {
       url: imageUrl,
       type: imageType,
       createdAt: new Date(),
+      prompt: prompt,
     };
     setImageCollection((prev) => [...prev, newImage]);
+
+    if (prompt.trim() && !promptHistory.some((item) => item.text === prompt)) {
+      setPromptHistory((prev) => [
+        {
+          id: Date.now(),
+          text: prompt,
+          model: model,
+          size: imageSize,
+          quality: quality,
+          timestamp: new Date(),
+        },
+        ...prev,
+      ]);
+    }
   };
 
   const removeFromCollection = (index) => {
@@ -149,14 +118,6 @@ function GenerateImagePage() {
   };
 
   const selectImageForEditing = (index) => {
-    // Don't allow editing if DALL-E 3 is selected
-    if (model === "dall-e-3") {
-      setError(
-        "Image editing is not available with DALL-E 3. Please select a different model to edit images."
-      );
-      return;
-    }
-
     const selectedImage = imageCollection[index];
 
     fetch(selectedImage.url)
@@ -176,7 +137,31 @@ function GenerateImagePage() {
       });
   };
 
-  // Functions for single image upload
+  const selectHistoryPrompt = (historyItem) => {
+    setPrompt(historyItem.text);
+
+    if (historyItem.model && modelOptions[historyItem.model]) {
+      setModel(historyItem.model);
+    }
+
+    if (historyItem.size) {
+      setImageSize(historyItem.size);
+    }
+
+    if (historyItem.quality) {
+      setQuality(historyItem.quality);
+    }
+  };
+
+  const removePromptFromHistory = (e, promptId) => {
+    e.stopPropagation();
+    setPromptHistory((prev) => prev.filter((item) => item.id !== promptId));
+  };
+
+  const clearPromptHistory = () => {
+    setPromptHistory([]);
+  };
+
   const handleMainImageUpload = (imageObj) => {
     setMainImage(imageObj);
   };
@@ -202,7 +187,6 @@ function GenerateImagePage() {
     setMaskImage(maskObj);
   };
 
-  // Functions for multiple image upload
   const handleMultipleImageUpload = (newImages) => {
     setUploadedImages([...uploadedImages, ...newImages]);
   };
@@ -295,16 +279,9 @@ function GenerateImagePage() {
       return batchEditImage(formData);
     },
     onSuccess: (response) => {
-      if (response && response.results && response.results.length > 0) {
-        const results = response.results;
-
-        results.forEach((result) => {
-          addToCollection(result.image_url, "batch-edited");
-        });
-
-        if (results[0]) {
-          setResultImage(results[0].image_url);
-        }
+      if (response && response.image_url) {
+        addToCollection(response.image_url, "batch-edited");
+        setResultImage(response.image_url);
       }
     },
     onError: (error) => {
@@ -318,20 +295,7 @@ function GenerateImagePage() {
   const handleGenerateImage = () => {
     setError(null);
 
-    if (model === "dall-e-3") {
-      // For DALL-E 3, only allow standard image generation
-      const requestData = {
-        prompt: prompt,
-        model: model,
-        size: imageSize,
-        quality: quality,
-        background: "auto",
-        output_format: "png",
-        output_compression: 0,
-      };
-
-      generateMutation.mutate(requestData);
-    } else if (editMode === "multiple" && uploadedImages.length > 0) {
+    if (editMode === "multiple" && uploadedImages.length > 0) {
       const batchData = {
         prompt: prompt,
         model: model,
@@ -374,21 +338,25 @@ function GenerateImagePage() {
 
   const handleDownload = () => {
     if (resultImage) {
-      fetch(resultImage)
-        .then((response) => response.blob())
-        .then((blob) => {
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `generated-image-${Date.now()}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        })
-        .catch(() => {
-          setError("Failed to download the image.");
-        });
+      try {
+        let fileName = "generated-image-" + Date.now() + ".png";
+        const urlParts = resultImage.split("/");
+        if (urlParts.length > 0) {
+          const lastPart = urlParts[urlParts.length - 1];
+          if (lastPart.includes(".")) {
+            fileName = lastPart;
+          }
+        }
+
+        const link = document.createElement("a");
+        link.href = resultImage;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (error) {
+        setError("Failed to download the image: " + error.message);
+      }
     }
   };
 
@@ -405,9 +373,7 @@ function GenerateImagePage() {
       return (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          {model === "dall-e-3"
-            ? "Generating..."
-            : editMode === "multiple"
+          {editMode === "multiple"
             ? "Editing Image References..."
             : mainImage
             ? maskImage
@@ -416,10 +382,6 @@ function GenerateImagePage() {
             : "Generating..."}
         </>
       );
-    }
-
-    if (model === "dall-e-3") {
-      return "Generate Image";
     }
 
     if (editMode === "multiple") {
@@ -438,49 +400,22 @@ function GenerateImagePage() {
     editMutation.isPending ||
     batchEditMutation.isPending;
 
-  const handleGenerateImageWithProgress = () => {
-    if (model === "dall-e-3") {
-      // For DALL-E 3, only allow standard image generation
-      const requestData = {
-        prompt: prompt,
-        model: model,
-        size: imageSize,
-        quality: quality,
-        background: "auto",
-        output_format: "png",
-        output_compression: 0,
-      };
-
-      generateMutation.mutate(requestData);
-    } else if (editMode === "multiple" && uploadedImages.length > 0) {
-      const batchData = {
-        prompt: prompt,
-        model: model,
-        size: imageSize,
-        output_format: "png",
-        output_compression: 0,
-        images: uploadedImages.map((img) => img.file),
-      };
-
-      batchEditMutation.mutate(batchData, {
-        onSuccess: () => {},
-        onError: () => {},
-      });
-    } else {
-      handleGenerateImage();
-    }
+  // Format timestamp cho lịch sử prompt
+  const formatTimestamp = (date) => {
+    return new Intl.DateTimeFormat("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
   };
 
-  // Check if we should show edit controls
-  const showEditControls = model !== "dall-e-3";
-
   return (
-    <div className="container mx-auto px-4">
+    <div className="px-4 max-w-full">
       <h1 className="text-3xl font-bold tracking-tight mb-6">
         Image{" "}
-        {model === "dall-e-3"
-          ? "Generator"
-          : editMode === "multiple"
+        {editMode === "multiple"
           ? "References"
           : mainImage
           ? "Editor"
@@ -508,50 +443,46 @@ function GenerateImagePage() {
             <CardHeader>
               <CardTitle>Input Parameters</CardTitle>
               <CardDescription>
-                {showEditControls
-                  ? "Describe what you want to generate and provide reference images"
-                  : "Describe what you want to generate"}
+                Describe what you want to generate and provide reference images
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Edit Mode Selector - Only show if not DALL-E 3 */}
-              {showEditControls && (
-                <div className="space-y-2">
-                  <Label>Edit Mode</Label>
-                  <div className="flex space-x-4">
-                    <Button
-                      variant={editMode === "single" ? "default" : "outline"}
-                      onClick={() => {
-                        setEditMode("single");
-                        if (editMode === "multiple") {
-                          setUploadedImages([]);
+              {/* Edit Mode Selector */}
+              <div className="space-y-2">
+                <Label>Edit Mode</Label>
+                <div className="flex space-x-4">
+                  <Button
+                    variant={editMode === "single" ? "default" : "outline"}
+                    onClick={() => {
+                      setEditMode("single");
+                      if (editMode === "multiple") {
+                        setUploadedImages([]);
+                      }
+                    }}
+                    className="flex-1"
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Single Image
+                  </Button>
+                  <Button
+                    variant={editMode === "multiple" ? "default" : "outline"}
+                    onClick={() => {
+                      setEditMode("multiple");
+                      if (editMode === "single") {
+                        if (mainImage?.preview) {
+                          URL.revokeObjectURL(mainImage.preview);
                         }
-                      }}
-                      className="flex-1"
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Single Image
-                    </Button>
-                    <Button
-                      variant={editMode === "multiple" ? "default" : "outline"}
-                      onClick={() => {
-                        setEditMode("multiple");
-                        if (editMode === "single") {
-                          if (mainImage?.preview) {
-                            URL.revokeObjectURL(mainImage.preview);
-                          }
-                          setMainImage(null);
-                          setMaskImage(null);
-                        }
-                      }}
-                      className="flex-1"
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      Multiple Images
-                    </Button>
-                  </div>
+                        setMainImage(null);
+                        setMaskImage(null);
+                      }
+                    }}
+                    className="flex-1"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Multiple Images
+                  </Button>
                 </div>
-              )}
+              </div>
 
               {/* Prompt Input */}
               <div className="space-y-2">
@@ -569,18 +500,12 @@ function GenerateImagePage() {
               <div className="grid grid-cols-3 gap-2">
                 <div className="space-y-2">
                   <Label htmlFor="model">Model</Label>
-                  <Select value={model} onValueChange={setModel}>
+                  <Select value={model} onValueChange={setModel} disabled>
                     <SelectTrigger id="model">
                       <SelectValue placeholder="Select model" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="gpt-image-1">GPT Image 1</SelectItem>
-                      {editMode !== "multiple" && (
-                        <>
-                          <SelectItem value="dall-e-2">DALL-E 2</SelectItem>
-                          <SelectItem value="dall-e-3">DALL-E 3</SelectItem>
-                        </>
-                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -630,44 +555,38 @@ function GenerateImagePage() {
                 </div>
               </div>
 
-              {showEditControls && <Separator />}
+              <Separator />
 
-              {/* Conditional render based on edit mode and model */}
-              {showEditControls &&
-                (editMode === "multiple" ? (
-                  <MultipleImageUpload
-                    uploadedImages={uploadedImages}
-                    onImageUpload={handleMultipleImageUpload}
-                    onImageRemove={removeUploadedImage}
-                  />
-                ) : (
-                  <SingleImageUpload
-                    mainImage={mainImage}
-                    maskImage={maskImage}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    onMainImageUpload={handleMainImageUpload}
-                    onRemoveMainImage={removeMainImage}
-                    onMaskCreated={handleMaskFromMarkEditor}
-                    onImageCreated={handleImageFromMarkEditor}
-                  />
-                ))}
+              {/* Conditional render based on edit mode */}
+              {editMode === "multiple" ? (
+                <MultipleImageUpload
+                  uploadedImages={uploadedImages}
+                  onImageUpload={handleMultipleImageUpload}
+                  onImageRemove={removeUploadedImage}
+                />
+              ) : (
+                <SingleImageUpload
+                  mainImage={mainImage}
+                  maskImage={maskImage}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  onMainImageUpload={handleMainImageUpload}
+                  onRemoveMainImage={removeMainImage}
+                  onMaskCreated={handleMaskFromMarkEditor}
+                  onImageCreated={handleImageFromMarkEditor}
+                />
+              )}
             </CardContent>
             <CardFooter>
               <Button
                 className="w-full"
                 size="lg"
-                onClick={handleGenerateImageWithProgress}
+                onClick={handleGenerateImage}
                 disabled={
                   isLoading ||
                   !prompt ||
-                  (showEditControls &&
-                    editMode === "single" &&
-                    mainImage &&
-                    !mainImage.file) ||
-                  (showEditControls &&
-                    editMode === "multiple" &&
-                    uploadedImages.length === 0)
+                  (editMode === "single" && mainImage && !mainImage.file) ||
+                  (editMode === "multiple" && uploadedImages.length === 0)
                 }
               >
                 {getButtonText()}
@@ -680,9 +599,7 @@ function GenerateImagePage() {
         <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle>
-              {model === "dall-e-3"
-                ? "Generated"
-                : editMode === "multiple"
+              {editMode === "multiple"
                 ? "New Image Edited"
                 : mainImage
                 ? "Edited"
@@ -691,9 +608,7 @@ function GenerateImagePage() {
             </CardTitle>
             <CardDescription>
               Your image will appear here after{" "}
-              {model === "dall-e-3"
-                ? "generation"
-                : editMode === "multiple"
+              {editMode === "multiple"
                 ? "batch editing"
                 : mainImage
                 ? maskImage
@@ -708,9 +623,7 @@ function GenerateImagePage() {
                 <div className="text-center">
                   <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
                   <p className="mt-4 font-medium text-muted-foreground">
-                    {model === "dall-e-3"
-                      ? "Generating your image..."
-                      : editMode === "multiple"
+                    {editMode === "multiple"
                       ? `Editing new image...`
                       : mainImage
                       ? maskImage
@@ -729,9 +642,7 @@ function GenerateImagePage() {
                 <div className="text-center">
                   <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto" />
                   <p className="mt-4 text-muted-foreground">
-                    {model === "dall-e-3"
-                      ? "Generated"
-                      : editMode === "multiple"
+                    {editMode === "multiple"
                       ? "Edited "
                       : mainImage
                       ? "Edited"
@@ -748,17 +659,14 @@ function GenerateImagePage() {
                 <Alert>
                   <AlertDescription>
                     Image{" "}
-                    {model === "dall-e-3"
-                      ? "generated"
-                      : editMode === "multiple"
+                    {editMode === "multiple"
                       ? "batch edited"
                       : mainImage
                       ? maskImage
                         ? "inpainted"
                         : "edited"
                       : "generated"}{" "}
-                    successfully! You can download{" "}
-                    {showEditControls ? "or make further adjustments" : ""}.
+                    successfully! You can download or make further adjustments.
                   </AlertDescription>
                 </Alert>
                 <div className="flex space-x-2 w-full">
@@ -770,95 +678,163 @@ function GenerateImagePage() {
                     <Download className="mr-2 h-4 w-4" />
                     Download
                   </Button>
-                  {showEditControls && editMode !== "multiple" && (
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        if (resultImage) {
-                          fetch(resultImage)
-                            .then((res) => res.blob())
-                            .then((blob) => {
-                              const file = new File(
-                                [blob],
-                                "result-image.png",
-                                {
-                                  type: "image/png",
-                                }
-                              );
-                              setMainImage({
-                                file,
-                                preview: resultImage,
-                              });
-                              setMaskImage(null);
-                              setEditMode("single");
-                              setActiveTab("upload");
-                            });
-                        }
-                      }}
-                    >
-                      <PenLine className="mr-2 h-4 w-4" />
-                      Edit Result
-                    </Button>
-                  )}
                 </div>
               </>
             )}
 
-            {/* Image collection grid */}
-            {imageCollection?.length > 0 && (
-              <div className="w-full mt-4">
-                <Label className="block mb-2">Image History</Label>
-                <div className="grid grid-cols-3 gap-2 overflow-y-auto max-h-64">
-                  {imageCollection?.map((image, index) => (
-                    <div
-                      key={image.id}
-                      className={`relative rounded-md overflow-hidden bg-muted cursor-pointer border-2 ${
-                        selectedImageIndex === index
-                          ? "border-primary"
-                          : "border-transparent"
-                      }`}
-                      onClick={() => selectImageForEditing(index)}
-                    >
-                      <img
-                        src={image.url}
-                        alt={`${image.type} image ${index + 1}`}
-                        className="w-full h-20 object-cover"
-                      />
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-70 hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeFromCollection(index);
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                      <div className="absolute bottom-0 left-0 right-0 bg-background/70 text-xs p-1 text-center truncate">
-                        {image.type} #{index + 1}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            {/* Tabs cho History */}
+            <div className="w-full mt-4">
+              <div className="flex space-x-2 mb-4">
+                <Button
+                  variant={activeView === "images" ? "default" : "outline"}
+                  onClick={() => setActiveView("images")}
+                  size="sm"
+                  className="flex-1"
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" />
+                  Images
+                </Button>
+                <Button
+                  variant={activeView === "prompts" ? "default" : "outline"}
+                  onClick={() => setActiveView("prompts")}
+                  size="sm"
+                  className="flex-1"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Prompts
+                </Button>
               </div>
-            )}
+
+              {/* Image History View */}
+              {activeView === "images" && imageCollection.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="block">Image History</Label>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 overflow-y-auto max-h-64">
+                    {imageCollection.map((image, index) => (
+                      <div
+                        key={image.id}
+                        className={`relative rounded-md overflow-hidden bg-muted cursor-pointer border-2 ${
+                          selectedImageIndex === index
+                            ? "border-primary"
+                            : "border-transparent"
+                        }`}
+                        onClick={() => selectImageForEditing(index)}
+                      >
+                        <img
+                          src={image.url}
+                          alt={`${image.type} image ${index + 1}`}
+                          className="w-full h-20 object-cover"
+                        />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-70 hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFromCollection(index);
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                        <div className="absolute bottom-0 left-0 right-0 bg-background/70 text-xs p-1 text-center truncate">
+                          {image.type} #{index + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Prompt History View */}
+              {activeView === "prompts" && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="block">Prompt History</Label>
+                    {promptHistory.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearPromptHistory}
+                        title="Clear all prompt history"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Clear All
+                      </Button>
+                    )}
+                  </div>
+
+                  {promptHistory.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p>No prompt history yet</p>
+                      <p className="text-sm">
+                        Your prompt history will appear here
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {promptHistory.map((historyItem) => (
+                        <div
+                          key={historyItem.id}
+                          className="p-3 bg-muted rounded-md hover:bg-muted/80 cursor-pointer transition-colors text-sm relative group"
+                          onClick={() => selectHistoryPrompt(historyItem)}
+                        >
+                          <div className="flex justify-between mb-1">
+                            <span className="text-xs text-muted-foreground">
+                              {historyItem.timestamp
+                                ? formatTimestamp(historyItem.timestamp)
+                                : ""}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) =>
+                                removePromptFromHistory(e, historyItem.id)
+                              }
+                              title="Remove from history"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+
+                          <p className="line-clamp-2">{historyItem.text}</p>
+
+                          {(historyItem.size || historyItem.quality) && (
+                            <div className="flex mt-2 text-xs text-muted-foreground">
+                              {historyItem.size && (
+                                <span className="mr-2 flex items-center">
+                                  <span className="bg-muted-foreground/20 rounded px-1.5 py-0.5">
+                                    {historyItem.size}
+                                  </span>
+                                </span>
+                              )}
+
+                              {historyItem.quality && (
+                                <span className="flex items-center">
+                                  <span className="bg-muted-foreground/20 rounded px-1.5 py-0.5">
+                                    Quality: {historyItem.quality}
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CheckCircle2 className="h-4 w-4 text-primary" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </CardFooter>
         </Card>
       </div>
-
-      {/* Add global CSS for checkerboard pattern */}
-      <style jsx global>{`
-        .bg-checkerboard {
-          background-image: linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
-            linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
-            linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
-          background-size: 20px 20px;
-          background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-        }
-      `}</style>
     </div>
   );
 }

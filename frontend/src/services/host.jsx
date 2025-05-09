@@ -6,4 +6,5 @@ export const HOST = {
   generate: "generate",
   editImage: "generate/edit",
   batchEditImage: "generate/batch-edit",
+  history: "generate/history",
 };

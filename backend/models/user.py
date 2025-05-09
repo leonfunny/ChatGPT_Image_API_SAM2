@@ -1,8 +1,15 @@
 from typing import List, Optional
 from core.database import Base
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Integer, String, Table, Column, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+image_sources = Table(
+    "image_sources",
+    Base.metadata,
+    Column("source_image_id", Integer, ForeignKey("images.id"), primary_key=True),
+    Column("generated_image_id", Integer, ForeignKey("images.id"), primary_key=True),
+)
 
 
 class User(Base):
@@ -31,8 +38,16 @@ class Image(Base):
     format: Mapped[str] = mapped_column(String(10), nullable=False)
     prompt: Mapped[Optional[str]] = mapped_column(String(10000), nullable=True)
     model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    is_source: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="images")
+
+    source_images: Mapped[List["Image"]] = relationship(
+        secondary=image_sources,
+        primaryjoin=(id == image_sources.c.generated_image_id),
+        secondaryjoin=(id == image_sources.c.source_image_id),
+        backref="generated_images",
+    )
 
     def __repr__(self) -> str:
         return f"<Image(id={self.id}, filename={self.gcs_filename})>"

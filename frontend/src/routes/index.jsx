@@ -6,6 +6,7 @@ import { RouteName } from "./routeName";
 import SideBar from "@/components/side-bar/index";
 
 const LoginPage = lazy(() => import("@/pages/login"));
+const HistoryPage = lazy(() => import("@/pages/history"));
 const GenerateImagePage = lazy(() => import("@/pages/generate-image"));
 
 const MainRouter = () => {
@@ -25,6 +26,7 @@ const MainRouter = () => {
               element={<GenerateImagePage />}
               path={RouteName.GENERATE_IMAGE}
             />
+            <Route element={<HistoryPage />} path={RouteName.HISTORY} />
           </Route>
         </Route>
 
