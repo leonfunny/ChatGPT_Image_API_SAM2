@@ -16,7 +16,7 @@ from api.v1.services.image import (
 )
 from core.config import settings
 from core.database import DbSession
-from models.user import User, Image
+from models.user import User
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 image_service = ImageService(

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
     GCS_BUCKET_NAME: str = os.getenv("GCS_BUCKET_NAME")
     GCS_CREDENTIALS_PATH: str = os.getenv("GCS_CREDENTIALS_PATH")
+    FAL_KEY: str = os.getenv("FAL_KEY")
 
     class Config:
         env_file = os.path.join(BASE_DIR, ".env")  # Path to the .env file
