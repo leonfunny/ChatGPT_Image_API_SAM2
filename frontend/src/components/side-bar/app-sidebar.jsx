@@ -1,4 +1,11 @@
-import { Bot, Command, LifeBuoy, Send, PaintbrushVertical } from "lucide-react";
+import {
+  Bot,
+  Command,
+  LifeBuoy,
+  Send,
+  PaintbrushVertical,
+  SquareDashedMousePointer,
+} from "lucide-react";
 
 import { NavMain } from "@/components/side-bar/nav-main";
 import { NavSecondary } from "@/components/side-bar/nav-secondary";
@@ -28,6 +35,11 @@ const data = {
           url: "history",
         },
       ],
+    },
+    {
+      title: "Auto Segment Image",
+      url: "segment-image",
+      icon: SquareDashedMousePointer,
     },
   ],
   navSecondary: [

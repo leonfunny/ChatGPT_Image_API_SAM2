@@ -28,7 +28,6 @@ import { Separator } from "@/components/ui/separator";
 
 const History = () => {
   const [currentPage, setCurrentPage] = useState(1);
-  const [fixedRightPanel, setFixedRightPanel] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
 
   const { data, isLoading, error } = useQuery({
@@ -255,7 +254,7 @@ const History = () => {
       </div>
 
       {/* Right Panel - Generation Interface */}
-      <div className={`w-1/3 ${fixedRightPanel ? "sticky top-0" : ""}`}>
+      <div className={`w-1/3  sticky top-0`}>
         <div className="flex flex-col h-full p-6">
           <div className="flex-1 flex flex-col items-center justify-center gap-6">
             {selectedImage ? (

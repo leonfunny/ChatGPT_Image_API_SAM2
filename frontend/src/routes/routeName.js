@@ -3,4 +3,5 @@ export const RouteName = {
   DASH_BOARD: "dashboard",
   GENERATE_IMAGE: "generate-image",
   HISTORY: "history",
+  SEGMENT_IMAGE: "segment-image",
 };

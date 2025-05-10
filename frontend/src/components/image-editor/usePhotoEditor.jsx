@@ -7,28 +7,16 @@ export const usePhotoEditor = ({
   defaultLineWidth = 30,
   defaultMode = "pan",
 }) => {
-  // Ref to the canvas element where the image will be drawn.
   const canvasRef = useRef(null);
-
-  // Create the image object using a ref
   const imgRef = useRef(new Image());
 
-  // State to hold the source of the image.
   const [imageSrc, setImageSrc] = useState("");
-
   const [zoom, setZoom] = useState(defaultZoom);
-
   const [mode, setMode] = useState(defaultMode);
   const [drawStart, setDrawStart] = useState(null);
-
-  // State variables for drawing on the canvas.
   const [lineColor, setLineColor] = useState(defaultLineColor);
   const [lineWidth, setLineWidth] = useState(defaultLineWidth);
-
-  // Thêm state mới để lưu thông tin về độ phân giải thực của ảnh
   const [imageResolution, setImageResolution] = useState(null);
-
-  // State để theo dõi tỷ lệ giữa kích thước thực và kích thước hiển thị
   const [scaleFactor, setScaleFactor] = useState(1);
 
   const drawingPathsRef = useRef([]);

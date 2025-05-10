@@ -3,7 +3,7 @@ import { usePhotoEditor } from "./usePhotoEditor";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Brush, RotateCcw } from "lucide-react"; // Import các biểu tượng từ Lucide
+import { Brush, RotateCcw } from "lucide-react";
 
 export const ReactPhotoEditor = ({
   file,
@@ -43,15 +43,12 @@ export const ReactPhotoEditor = ({
     scaleFactor,
   } = usePhotoEditor({ file });
 
-  // Hàm này tạo một điểm tròn có kích thước tự động điều chỉnh theo độ phân giải
   const getCustomCursor = (brushSize) => {
-    // Tính toán kích thước hiển thị của brush dựa trên tỷ lệ scaleFactor
     const visualBrushSize = Math.max(
       2,
       Math.round(brushSize / (scaleFactor || 1))
     );
 
-    // Vẫn sử dụng cursor tùy chỉnh vì cần hiển thị kích thước brush trực quan
     return `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="${visualBrushSize}" height="${visualBrushSize}" viewBox="0 0 ${visualBrushSize} ${visualBrushSize}"><circle cx="${
       visualBrushSize / 2
     }" cy="${visualBrushSize / 2}" r="${
@@ -67,7 +64,6 @@ export const ReactPhotoEditor = ({
     }
   }, [open]);
 
-  // Cập nhật con trỏ chuột khi lineWidth hoặc mode thay đổi
   useEffect(() => {
     if (canvasRef.current && mode === "draw") {
       canvasRef.current.style.cursor = getCustomCursor(lineWidth);

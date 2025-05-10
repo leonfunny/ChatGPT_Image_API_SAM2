@@ -7,6 +7,7 @@ import SideBar from "@/components/side-bar/index";
 
 const LoginPage = lazy(() => import("@/pages/login"));
 const HistoryPage = lazy(() => import("@/pages/history"));
+const SegmentImagePage = lazy(() => import("@/pages/segment-image"));
 const GenerateImagePage = lazy(() => import("@/pages/generate-image"));
 
 const MainRouter = () => {
@@ -27,6 +28,10 @@ const MainRouter = () => {
               path={RouteName.GENERATE_IMAGE}
             />
             <Route element={<HistoryPage />} path={RouteName.HISTORY} />
+            <Route
+              element={<SegmentImagePage />}
+              path={RouteName.SEGMENT_IMAGE}
+            />
           </Route>
         </Route>
 

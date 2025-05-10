@@ -3,9 +3,7 @@ import { useSelector } from "react-redux";
 import { Navigate, Outlet, useLocation } from "react-router";
 
 const RouteGuard = () => {
-  const { access_token, userInfo } = useSelector(
-    (state) => state["feature/user"]
-  );
+  const { access_token } = useSelector((state) => state["feature/user"]);
   const location = useLocation();
   if (access_token && !location?.search && location?.pathname === "/") {
     return (
