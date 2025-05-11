@@ -1,6 +1,8 @@
 import io
 import base64
+import aiohttp
 from typing import Optional, List
+import uuid
 from api.v1.schemas.generate_image import (
     GenerateImageRequest,
     ImageHistoryPaginatedResponse,
@@ -16,7 +18,7 @@ from api.v1.services.image import (
 )
 from core.config import settings
 from core.database import DbSession
-from models.user import User
+from models.user import Image, User
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 image_service = ImageService(
@@ -247,4 +249,127 @@ async def get_image_history(
     except Exception as e:
         if not isinstance(e, HTTPException):
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise e
+
+
+@router.post("/edit-from-url", response_model=ImageResponse)
+async def edit_image_from_url(
+    db: DbSession,
+    prompt: str = Form(...),
+    model: str = Form("gpt-image-1"),
+    size: str = Form("1024x1024"),
+    output_format: str = Form("png"),
+    output_compression: Optional[int] = Form(None),
+    image_url: str = Form(...),  # URL từ Google Cloud Storage
+    mask_base64: Optional[str] = Form(None),  # Mask dưới dạng base64
+    current_user: User = Depends(get_current_user),
+):
+    source_image_record = None
+    mask_source_image = None
+
+    try:
+        url_parts = image_url.split("/")
+        bucket_name = url_parts[3]
+        gcs_filename = "/".join(url_parts[4:])
+        original_filename = url_parts[-1]
+        image_format = original_filename.split(".")[-1].lower()
+
+        source_image_record = Image(
+            user_id=current_user.id,
+            gcs_bucket=bucket_name,
+            gcs_filename=gcs_filename,
+            gcs_public_url=image_url,
+            original_filename=original_filename,
+            content_type=f"image/{image_format}",
+            size_bytes=0,
+            format=image_format,
+            is_source=True,
+        )
+
+        db.add(source_image_record)
+        await db.flush()
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(image_url) as response:
+                if response.status != 200:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Không thể tải ảnh từ URL: {response.status}",
+                    )
+                image_data = await response.read()
+
+        source_image_record.size_bytes = len(image_data)
+        image_file = io.BytesIO(image_data)
+        image_file.name = original_filename
+
+        mask_file = None
+        if mask_base64:
+            if "," in mask_base64:
+                mask_base64 = mask_base64.split(",", 1)[1]
+
+            mask_data = base64.b64decode(mask_base64)
+            mask_filename = f"mask_{uuid.uuid4()}.png"
+
+            mask_source_image = await image_service.upload_source_image_to_gcs(
+                image_data=mask_data,
+                original_filename=mask_filename,
+                user_id=current_user.id,
+                db=db,
+            )
+
+            mask_file = io.BytesIO(mask_data)
+            mask_file.name = mask_filename
+
+        params = prepare_openai_params(
+            model=model,
+            prompt=prompt,
+            size=size,
+            output_format=output_format,
+            output_compression=output_compression,
+        )
+
+        try:
+            result = await image_service.edit_image(
+                image_file=image_file, mask_file=mask_file, params=params
+            )
+            image_content = base64.b64decode(result.b64_json)
+
+            source_images = [source_image_record]
+            if mask_source_image:
+                source_images.append(mask_source_image)
+
+            await db.commit()
+
+            result = await image_service.process_and_store_image(
+                image_content=image_content,
+                output_format=output_format,
+                user_id=current_user.id,
+                prompt=prompt,
+                model=model,
+                db=db,
+                source_images=source_images,
+            )
+
+            return ImageResponse(**result)
+
+        except OpenAIError as e:
+            if source_image_record and source_image_record.id:
+                await db.delete(source_image_record)
+            if mask_source_image:
+                await image_service.delete_image_from_gcs(mask_source_image, db)
+
+            await db.commit()
+            raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+
+    except Exception as e:
+        if source_image_record and source_image_record.id:
+            await db.delete(source_image_record)
+        if mask_source_image:
+            await image_service.delete_image_from_gcs(mask_source_image, db)
+
+        await db.commit()
+
+        if not isinstance(e, HTTPException):
+            raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
         raise e

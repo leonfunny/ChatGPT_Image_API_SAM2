@@ -1,8 +1,7 @@
-from http.client import HTTPException
 from typing import Optional
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile, Path, HTTPException
 
-from api.v1.schemas.upload import ImageUploadResponse
+from api.v1.schemas.upload import DeleteImageRequest, ImageUploadResponse
 from core.google_cloud import ImageStorage
 from core.config import settings
 
@@ -29,3 +28,24 @@ async def upload_image(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi upload ảnh: {str(e)}")
+
+
+@router.delete("/images", status_code=204)
+def delete_image(
+    request: DeleteImageRequest,
+    storage: ImageStorage = Depends(get_image_storage),
+):
+    try:
+        image_url = request.image_url
+
+        if image_url.startswith("image_data_learning/"):
+            image_path = image_url.replace("image_data_learning/", "")
+
+        success = storage.delete_image(image_path=image_path)
+        if not success:
+            raise HTTPException(
+                status_code=404, detail="Không tìm thấy ảnh hoặc xóa thất bại"
+            )
+        return None
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa ảnh: {str(e)}")

@@ -35,4 +35,16 @@ const batchEditImage = async (data) => {
   return response?.data;
 };
 
-export { generate, editImage, batchEditImage };
+const editURLImage = async (data) => {
+  const response = await Request({
+    method: HTTP_METHOD.POST,
+    url: HOST.editURLImage,
+    data: data,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response?.data;
+};
+
+export { generate, editImage, batchEditImage, editURLImage };

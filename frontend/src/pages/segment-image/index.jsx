@@ -12,12 +12,26 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import useWebSocketConnection from "@/hooks/useWebSocketConnection";
 import useImageContour from "@/hooks/useImageContour";
 import axios from "axios";
 import { useSelector } from "react-redux";
 import LoadingSuspense from "@/components/loading";
 
+import { HOST } from "@/services/host";
+
+const BASE_WEBSOCKET = import.meta.env.VITE_BASE_WEBSOCKET;
+const BASE_API_URL = import.meta.env.VITE_BASE_API_URL;
 const ImageSegmentationApp = () => {
   const { access_token } = useSelector((state) => state["feature/user"]);
 
@@ -25,9 +39,16 @@ const ImageSegmentationApp = () => {
   const [imageUrl, setImageUrl] = useState("");
   const [maskImage, setMaskImage] = useState(null);
   const [clientId, setClientId] = useState(null);
-  const [status, setStatus] = useState("idle");
+  const [status, setStatus] = useState("idle"); // idle, uploading, deleting, ready, processing, success, error, disconnected
   const [selectedPoints, setSelectedPoints] = useState([]);
   const [processedImage, setProcessedImage] = useState(null);
+  const [generatedImage, setGeneratedImage] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Thêm state mới cho các tính năng yêu cầu
+  const [prompt, setPrompt] = useState("");
+  const [model, setModel] = useState("gpt-image-1");
+  const [imageSize, setImageSize] = useState("auto");
 
   const imageRef = useRef(null);
 
@@ -46,9 +67,8 @@ const ImageSegmentationApp = () => {
   }, []);
 
   const { wsStatus, sendMessage, reconnect, setOnMessageHandler } =
-    useWebSocketConnection("ws://localhost:8000/api/v1/auto-segment", clientId);
+    useWebSocketConnection(`ws://${BASE_WEBSOCKET}auto-segment`, clientId);
 
-  // Đăng ký callback để xử lý tin nhắn WebSocket
   useEffect(() => {
     if (setOnMessageHandler) {
       setOnMessageHandler(handleWebSocketResponse);
@@ -72,7 +92,6 @@ const ImageSegmentationApp = () => {
   // Handle errors from contour processing
   useEffect(() => {
     if (contourError) {
-      // Critical error - keep toast
       toast.error(contourError);
     }
   }, [contourError]);
@@ -86,17 +105,16 @@ const ImageSegmentationApp = () => {
       setStatus("uploading");
       clearResult();
       setMaskImage(null);
+      setProcessedImage(null);
 
-      // Create a URL for the selected image
-      const objectUrl = URL.createObjectURL(file);
-      setOriginalImage(objectUrl);
-
-      // Upload to server
+      // Upload to server first before creating local preview
       const formData = new FormData();
       formData.append("file", file);
 
+      toast.info("Uploading image to Google Cloud Storage...");
+
       const response = await axios.post(
-        "http://localhost:8000/api/v1/upload",
+        `${BASE_API_URL}${HOST.upload}`,
         formData,
         {
           headers: {
@@ -106,19 +124,19 @@ const ImageSegmentationApp = () => {
         }
       );
 
-      // Kiểm tra xem response.data có chứa url không
       if (response.data && response.data.url) {
-        const fullImageUrl = response.data.url.startsWith("http")
-          ? response.data.url
-          : `http://localhost:8000${response.data.url}`;
+        const objectUrl = URL.createObjectURL(file);
+        setOriginalImage(objectUrl);
+
+        const fullImageUrl = response.data.url;
 
         setImageUrl(fullImageUrl);
         setStatus("ready");
+        toast.success("Image uploaded successfully!");
       } else {
         throw new Error("Invalid response format: missing image URL");
       }
     } catch (error) {
-      console.error("Error uploading image:", error);
       toast.error(error.message || "Error uploading image");
       setStatus("error");
     }
@@ -147,6 +165,51 @@ const ImageSegmentationApp = () => {
       ...prevPoints,
       { x: pixelX, y: pixelY, label: 1 },
     ]);
+  };
+
+  const handleClearResult = () => {
+    clearResult();
+    setMaskImage(null);
+    setSelectedPoints([]);
+    setOriginalImage(null);
+    setImageUrl("");
+    setProcessedImage(null);
+    setGeneratedImage(null);
+  };
+
+  // Handle delete image
+  const handleDeleteImage = async () => {
+    if (!imageUrl) return;
+
+    try {
+      setStatus("deleting");
+      toast.info("Deleting image...");
+
+      // Extract image path from the full URL
+      const urlObj = new URL(imageUrl);
+      const imagePath = urlObj.pathname.startsWith("/")
+        ? urlObj.pathname.substring(1)
+        : urlObj.pathname;
+
+      await axios.delete("http://localhost:8000/api/v1/images", {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${access_token}`,
+        },
+        data: {
+          image_url: imagePath,
+        },
+      });
+
+      handleClearResult();
+
+      setStatus("idle");
+      toast.success("Image deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      toast.error(error.message || "Error deleting image");
+      setStatus("error");
+    }
   };
 
   const clearSelectedPoints = () => {
@@ -185,25 +248,86 @@ const ImageSegmentationApp = () => {
     }
   };
 
+  // Thêm hàm mới để generate image
+  const generateImage = async () => {
+    if (!originalImage || !maskImage) {
+      toast.error("Both original and mask images are required");
+      return;
+    }
+
+    if (!prompt) {
+      toast.error("Please provide a text prompt");
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      toast.info("Generating new image...");
+      setStatus("processing");
+
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+      formData.append("model", model);
+      formData.append("size", imageSize);
+      formData.append("output_format", "png");
+
+      formData.append("image_url", imageUrl);
+
+      if (processedImage) {
+        const response = await fetch(processedImage);
+        const blob = await response.blob();
+
+        const reader = new FileReader();
+
+        const base64Data = await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+
+        formData.append("mask_base64", base64Data);
+      }
+
+      const response = await axios.post(
+        `${BASE_API_URL}${HOST.editURLImage}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${access_token}`,
+          },
+        }
+      );
+
+      if (response.data && response.data.image_url) {
+        setGeneratedImage(response.data.image_url);
+        setStatus("success");
+        toast.success("Image generated successfully!");
+      } else {
+        throw new Error("Invalid response format: missing generated image URL");
+      }
+    } catch (error) {
+      toast.error(error.message || "Error generating image");
+      setStatus("error");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // Xử lý phản hồi từ WebSocket
   const handleWebSocketResponse = (data) => {
     if (data.status === "success" && data.result) {
       const { image_url, original_image_url } = data.result;
       setMaskImage(image_url);
 
-      // Gọi findContours và lấy cả hai kết quả trả về
       const contourResult = findContours(image_url, original_image_url);
 
       if (contourResult && contourResult.then) {
-        // Nếu findContours trả về Promise
         contourResult.then((result) => {
           if (result) {
-            // Lưu URL của ảnh đã xử lý (vùng đã chọn bị xóa)
             setProcessedImage(result.processedImageUrl);
           }
         });
       } else if (contourResult) {
-        // Nếu findContours không trả về Promise
         setProcessedImage(contourResult.processedImageUrl);
       }
 
@@ -228,7 +352,9 @@ const ImageSegmentationApp = () => {
       <LoadingSuspense />
       <span className="mt-4 text-sm text-slate-500">
         {status === "uploading"
-          ? "Uploading image..."
+          ? "Uploading image to Google Cloud Storage..."
+          : status === "deleting"
+          ? "Deleting image from Google Cloud Storage..."
           : "Processing segmentation..."}
       </span>
     </div>
@@ -339,6 +465,10 @@ const ImageSegmentationApp = () => {
     );
   };
 
+  // Kiểm tra xem có nên hiển thị phần Image Generation hay không
+  const shouldShowImageGeneration =
+    maskImage !== null && processedImage !== null;
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="flex flex-col gap-2 mb-6">
@@ -383,7 +513,8 @@ const ImageSegmentationApp = () => {
         )
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Lưới 2 cột cho phần chọn ảnh và kết quả phân đoạn */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* Upload and point selection card */}
         <Card className="">
           <CardHeader className="pb-3">
@@ -397,8 +528,10 @@ const ImageSegmentationApp = () => {
 
           <CardContent>
             {/* Upload button */}
-            {!originalImage ? (
-              <div className="flex items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-8 bg-slate-50">
+            {status === "deleting" ? (
+              renderLoading()
+            ) : !originalImage ? (
+              <div className="flex flex-col justify-center items-center h-64 border-2 border-dashed border-slate-200 rounded-lg bg-slate-50">
                 <label className="cursor-pointer flex flex-col items-center gap-2">
                   <div className="p-3 rounded-full bg-primary/10 text-primary">
                     <Upload size={24} />
@@ -429,13 +562,8 @@ const ImageSegmentationApp = () => {
                       variant="secondary"
                       size="icon"
                       className="h-6 w-6 bg-white"
-                      onClick={() => {
-                        clearResult();
-                        setMaskImage(null);
-                        setSelectedPoints([]);
-                        setOriginalImage(null);
-                        setImageUrl("");
-                      }}
+                      onClick={handleDeleteImage}
+                      disabled={status === "deleting" || isProcessing}
                     >
                       <X size={12} />
                     </Button>
@@ -521,7 +649,7 @@ const ImageSegmentationApp = () => {
               <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full inline-flex items-center justify-center mr-2 text-xs">
                 2
               </span>
-              Segmentation Results
+              Segmentation
             </CardTitle>
           </CardHeader>
 
@@ -539,6 +667,113 @@ const ImageSegmentationApp = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Image Generation Card ở hàng riêng biệt - Chỉ hiển thị khi có kết quả phân đoạn */}
+      {shouldShowImageGeneration && (
+        <Card className="w-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center text-lg">
+              <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full inline-flex items-center justify-center mr-2 text-xs">
+                3
+              </span>
+              Image Generation
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="prompt">Text Prompt</Label>
+                <Textarea
+                  id="prompt"
+                  placeholder="Describe what you want to generate (e.g., 'a red sports car in a futuristic city')"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  className="resize-none"
+                />
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="model">Model</Label>
+                  <Select value={model} onValueChange={setModel}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gpt-image-1">gpt-image-1</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="size">Size</Label>
+                  <Select value={imageSize} onValueChange={setImageSize}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto (default)</SelectItem>
+                      <SelectItem value="1024x1024">
+                        1024x1024 (square)
+                      </SelectItem>
+                      <SelectItem value="1536x1024">
+                        1536x1024 (landscape)
+                      </SelectItem>
+                      <SelectItem value="1024x1536">
+                        1024x1536 (portrait)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+
+          <CardFooter className="flex-col border-t p-4 bg-slate-50">
+            <div className="flex justify-end w-full gap-2 mb-4">
+              <Button variant="outline" onClick={handleClearResult}>
+                Clear
+              </Button>
+              <Button
+                onClick={generateImage}
+                disabled={
+                  !maskImage || !originalImage || isGenerating || generatedImage
+                }
+                className="gap-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader className="h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4" />
+                    Generate Image
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Hiển thị hình ảnh đã tạo nếu có */}
+            {generatedImage && (
+              <div className="w-full flex flex-col items-center">
+                <h3 className="font-medium mb-2">Generated Image</h3>
+                <div className="border rounded-lg overflow-hidden w-">
+                  <img
+                    src={generatedImage}
+                    alt="Generated Image"
+                    className="w-full h-auto"
+                  />
+                </div>
+              </div>
+            )}
+          </CardFooter>
+        </Card>
+      )}
     </div>
   );
 };

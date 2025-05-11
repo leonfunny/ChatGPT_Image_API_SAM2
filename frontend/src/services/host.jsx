@@ -5,6 +5,8 @@ export const HOST = {
   register: "auth/register",
   generate: "generate",
   editImage: "generate/edit",
+  editURLImage: "generate/edit-from-url",
   batchEditImage: "generate/batch-edit",
   history: "generate/history",
+  upload: "upload",
 };
