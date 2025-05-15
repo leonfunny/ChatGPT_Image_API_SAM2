@@ -1,8 +1,19 @@
 from typing import List, Optional
 from core.database import Base
 
-from sqlalchemy import ForeignKey, Integer, String, Table, Column, Boolean
+from sqlalchemy import (
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Column,
+    Boolean,
+    Float,
+    DateTime,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import datetime
 
 image_sources = Table(
     "image_sources",
@@ -51,3 +62,23 @@ class Image(Base):
 
     def __repr__(self) -> str:
         return f"<Image(id={self.id}, filename={self.gcs_filename})>"
+
+
+class VideoRequest(Base):
+    __tablename__ = "video_requests"
+
+    id = Column(String(36), primary_key=True, index=True)
+    status = Column(String(20), index=True)
+    prompt = Column(String(10000))
+    image_url = Column(String(500))
+    original_filename = Column(String(255), nullable=True)
+    duration = Column(String(5))
+    aspect_ratio = Column(String(10))
+    negative_prompt = Column(Text, nullable=True)
+    cfg_scale = Column(Float)
+    video_url = Column(String(500), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    processing_time = Column(Float, nullable=True)
+    kling_request_id = Column(String(100), nullable=True)

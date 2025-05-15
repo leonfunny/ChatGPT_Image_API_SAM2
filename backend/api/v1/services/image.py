@@ -3,10 +3,10 @@ import uuid
 from typing import Optional, Dict, Any, List, Tuple
 
 from fastapi import UploadFile, HTTPException
-from openai import OpenAI, OpenAIError
+from openai import OpenAIError, AsyncOpenAI
 
 from core.google_cloud import ImageStorage
-from models.user import Image, User
+from models.user import Image, image_sources
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 
 class ImageService:
     def __init__(self, openai_api_key: str, bucket_name: str, credentials_path: str):
-        self.client = OpenAI(api_key=openai_api_key)
+        self.client = AsyncOpenAI(api_key=openai_api_key)
         self.image_storage = ImageStorage(
             bucket_name=bucket_name, credentials_path=credentials_path
         )
@@ -24,7 +24,7 @@ class ImageService:
 
     async def generate_image(self, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            response = self.client.images.generate(**params)
+            response = await self.client.images.generate(**params)
             return response.data[0]
         except OpenAIError as e:
             raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
@@ -37,11 +37,11 @@ class ImageService:
     ) -> Dict[str, Any]:
         try:
             if mask_file:
-                response = self.client.images.edit(
+                response = await self.client.images.edit(
                     image=image_file, mask=mask_file, **params
                 )
             else:
-                response = self.client.images.edit(image=image_file, **params)
+                response = await self.client.images.edit(image=image_file, **params)
             return response.data[0]
         except OpenAIError as e:
             raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
@@ -255,3 +255,102 @@ class ImageHistoryService:
             "size": size,
             "pages": pages,
         }
+
+    @staticmethod
+    async def delete_image_with_sources(
+        db: AsyncSession,
+        image_storage,
+        image_id: int,
+        user_id: int,
+    ) -> Dict[str, Any]:
+        try:
+            query = (
+                select(Image)
+                .where(and_(Image.id == image_id, Image.user_id == user_id))
+                .options(selectinload(Image.source_images))
+            )
+
+            result = await db.execute(query)
+            image = result.scalar_one_or_none()
+
+            if not image:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Image not found or you don't have permission to delete it",
+                )
+
+            related_source_images = []
+            if not image.is_source and image.source_images:
+                related_source_images = list(image.source_images)
+
+            if not image.is_source:
+                try:
+                    await db.execute(
+                        f"""
+                        DELETE FROM image_sources 
+                        WHERE generated_image_id = {image_id}
+                        """
+                    )
+                except Exception as e:
+                    print(f"Error deleting from image_sources table: {str(e)}")
+
+            try:
+                image_storage.delete_image(image.gcs_filename)
+                print(f"Successfully deleted image file: {image.gcs_filename}")
+            except Exception as e:
+                print(f"Warning: Failed to delete image file from storage: {str(e)}")
+
+            # 3. Xóa bản ghi ảnh chính từ database
+            await db.delete(image)
+            await db.flush()  # Flush để cập nhật thay đổi ngay lập tức
+
+            # 4. Xóa các ảnh nguồn nếu có
+            deleted_source_count = 0
+            for source_image in related_source_images:
+                try:
+                    # Kiểm tra xem ảnh nguồn có được sử dụng bởi ảnh khác không
+                    check_query = (
+                        select(func.count())
+                        .select_from(image_sources)
+                        .where(image_sources.c.source_image_id == source_image.id)
+                    )
+                    source_usage_count = await db.scalar(check_query)
+
+                    # Chỉ xóa ảnh nguồn nếu không được sử dụng bởi ảnh khác
+                    if source_usage_count == 0:
+                        try:
+                            image_storage.delete_image(source_image.gcs_filename)
+                            print(
+                                f"Successfully deleted source image file: {source_image.gcs_filename}"
+                            )
+                        except Exception as e:
+                            print(
+                                f"Warning: Failed to delete source image file from storage: {str(e)}"
+                            )
+
+                        await db.delete(source_image)
+                        deleted_source_count += 1
+                    else:
+                        print(
+                            f"Source image {source_image.id} is still referenced by other images, not deleting"
+                        )
+                except Exception as e:
+                    print(f"Error processing source image {source_image.id}: {str(e)}")
+
+            # 5. Commit tất cả thay đổi
+            await db.commit()
+
+            return {
+                "success": True,
+                "message": "Image deleted successfully along with related source images",
+                "image_id": image_id,
+                "deleted_source_count": deleted_source_count,
+            }
+
+        except Exception as e:
+            await db.rollback()
+            if isinstance(e, HTTPException):
+                raise e
+            raise HTTPException(
+                status_code=500, detail=f"Error deleting image: {str(e)}"
+            )

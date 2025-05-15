@@ -74,6 +74,7 @@ async def edit_image(
     size: str = Form("1024x1024"),
     output_format: str = Form("png"),
     output_compression: Optional[int] = Form(None),
+    quality: Optional[str] = Form(None),
     image: UploadFile = File(...),
     mask: Optional[UploadFile] = File(None),
     current_user: User = Depends(get_current_user),
@@ -111,6 +112,7 @@ async def edit_image(
             size=size,
             output_format=output_format,
             output_compression=output_compression,
+            quality=quality,
         )
 
         try:
@@ -261,7 +263,7 @@ async def edit_image_from_url(
     output_format: str = Form("png"),
     output_compression: Optional[int] = Form(None),
     image_url: str = Form(...),  # URL từ Google Cloud Storage
-    mask_base64: Optional[str] = Form(None),  # Mask dưới dạng base64
+    mask_file: Optional[UploadFile] = File(None),
     current_user: User = Depends(get_current_user),
 ):
     source_image_record = None
@@ -302,12 +304,9 @@ async def edit_image_from_url(
         image_file = io.BytesIO(image_data)
         image_file.name = original_filename
 
-        mask_file = None
-        if mask_base64:
-            if "," in mask_base64:
-                mask_base64 = mask_base64.split(",", 1)[1]
-
-            mask_data = base64.b64decode(mask_base64)
+        mask_file_io = None
+        if mask_file:
+            mask_data = await mask_file.read()
             mask_filename = f"mask_{uuid.uuid4()}.png"
 
             mask_source_image = await image_service.upload_source_image_to_gcs(
@@ -317,8 +316,8 @@ async def edit_image_from_url(
                 db=db,
             )
 
-            mask_file = io.BytesIO(mask_data)
-            mask_file.name = mask_filename
+            mask_file_io = io.BytesIO(mask_data)
+            mask_file_io.name = mask_filename
 
         params = prepare_openai_params(
             model=model,
@@ -330,7 +329,7 @@ async def edit_image_from_url(
 
         try:
             result = await image_service.edit_image(
-                image_file=image_file, mask_file=mask_file, params=params
+                image_file=image_file, mask_file=mask_file_io, params=params
             )
             image_content = base64.b64decode(result.b64_json)
 
@@ -372,4 +371,24 @@ async def edit_image_from_url(
         if not isinstance(e, HTTPException):
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
+        raise e
+
+
+@router.delete("/history/{image_id}", response_model=dict)
+async def delete_image(
+    image_id: int,
+    db: DbSession,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        result = await ImageHistoryService.delete_image_with_sources(
+            db=db,
+            image_storage=image_service.image_storage,
+            image_id=image_id,
+            user_id=current_user.id,
+        )
+        return result
+    except Exception as e:
+        if not isinstance(e, HTTPException):
+            raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
         raise e

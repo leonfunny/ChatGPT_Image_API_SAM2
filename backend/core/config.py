@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     GCS_BUCKET_NAME: str = os.getenv("GCS_BUCKET_NAME")
     GCS_CREDENTIALS_PATH: str = os.getenv("GCS_CREDENTIALS_PATH")
     FAL_KEY: str = os.getenv("FAL_KEY")
+    LEONARDO_API_URL: str = "https://cloud.leonardo.ai/api/rest/v1"
+    LEONARDO_API_KEY: str = os.getenv("LEONARDO_API_KEY")
 
     class Config:
         env_file = os.path.join(BASE_DIR, ".env")  # Path to the .env file
