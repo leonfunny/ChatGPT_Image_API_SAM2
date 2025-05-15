@@ -35,6 +35,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 const History = () => {
@@ -56,7 +62,7 @@ const History = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["history", currentPage]);
 
-      if (selectedImage && selectedImage.id === imageToDelete.id) {
+      if (selectedImage && selectedImage?.id === imageToDelete?.id) {
         setSelectedImage(null);
       }
 
@@ -229,9 +235,18 @@ const History = () => {
                           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                             Prompt
                           </h2>
-                          <p className="text-sm line-clamp-4 text-foreground mb-4">
-                            {item.prompt}
-                          </p>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <p className="text-sm line-clamp-4 text-foreground mb-4">
+                                  {item.prompt}
+                                </p>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs p-4">
+                                <p className="text-sm">{item.prompt}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
 
                           {item.source_images &&
                             item.source_images.length > 0 && (
@@ -338,9 +353,19 @@ const History = () => {
                   <Badge variant="outline" className="mb-3">
                     {selectedImage.model}
                   </Badge>
-                  <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
-                    {selectedImage.prompt}
-                  </p>
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                          {selectedImage.prompt}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs p-4">
+                        <p className="text-sm">{selectedImage.prompt}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
                   {selectedImage.source_images &&
                     selectedImage.source_images.length > 0 && (
@@ -404,9 +429,18 @@ const History = () => {
               />
               <div className="flex-1">
                 <p className="text-sm font-medium">{imageToDelete.model}</p>
-                <p className="text-xs text-muted-foreground line-clamp-2">
-                  {imageToDelete.prompt}
-                </p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {imageToDelete.prompt}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs p-4">
+                      <p className="text-xs">{imageToDelete.prompt}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
           )}

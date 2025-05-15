@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { Upload, X, ArrowRight, Download } from "lucide-react";
+import { Upload, X, ArrowRight } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -18,12 +18,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { languages, modelOptions, templateString } from "@/utils/constants";
 import IdeaCard from "./idea-card";
+import ImageGenerateResult from "./image-generate";
 import GeneratePromptStep from "./generate-prompt";
 import { promptGenerating } from "@/services/picture-ads";
-import { editImage } from "@/services/generate-image";
+import { editImage } from "@/services/picture-ads";
+import { extractJsonFromContent } from "@/utils/functions";
 
 const PictureAdsTab = () => {
   const model = "gpt-image-1";
@@ -87,32 +88,6 @@ const PictureAdsTab = () => {
     setUploadedImages(newImages);
   };
 
-  const extractJsonFromContent = (content) => {
-    const jsonRegex = /```json\n([\s\S]*?)\n```/;
-    const match = content.match(jsonRegex);
-
-    if (match && match[1]) {
-      try {
-        const parsed = JSON.parse(match[1]);
-        if (Array.isArray(parsed)) {
-          const transformed = {};
-          parsed.forEach((item) => {
-            const ideaKey = Object.keys(item)[0];
-            transformed[ideaKey] = item[ideaKey];
-          });
-          return transformed;
-        }
-
-        return parsed;
-      } catch (error) {
-        console.error("Failed to parse JSON:", error);
-        return null;
-      }
-    } else {
-      return null;
-    }
-  };
-
   const handleProcessPrompt = async () => {
     if (!promptInput.trim()) {
       alert("Please enter a prompt");
@@ -135,7 +110,9 @@ const PictureAdsTab = () => {
         if (extractedData) {
           setResult(extractedData);
         } else {
-          throw new Error("Failed to extract JSON from response content");
+          throw new Error(
+            "AI not generated JSON from response content. Please try again."
+          );
         }
       } else {
         throw new Error("Invalid response format from API");
@@ -524,62 +501,7 @@ const PictureAdsTab = () => {
             )}
 
             {generatedBanners.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xl font-medium">Generated Banners</h3>
-                  <Badge variant="outline" className="text-sm">
-                    {generatedBanners.length} banner
-                    {generatedBanners.length !== 1 ? "s" : ""}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {generatedBanners.map((banner) => (
-                    <Card
-                      key={banner.id}
-                      className="overflow-hidden hover:shadow-md transition-all"
-                    >
-                      <div className="aspect-video w-full overflow-hidden">
-                        <img
-                          src={banner.imageUrl}
-                          alt={`Banner for ${banner.idea}`}
-                          className="w-full h-full object-cover hover:scale-105 transition-transform"
-                        />
-                      </div>
-                      <div className="p-3">
-                        <div className="flex justify-between items-center">
-                          <h4 className="font-medium truncate">
-                            {banner.idea}
-                          </h4>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {new Date(banner.timestamp).toLocaleString()}
-                        </p>
-                        <div className="flex justify-end mt-2 gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() => window.open(banner.imageUrl)}
-                          >
-                            Preview
-                          </Button>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() =>
-                              window.open(banner.imageUrl, "_blank")
-                            }
-                          >
-                            <Download />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
+              <ImageGenerateResult generatedBanners={generatedBanners} />
             )}
           </CardContent>
           <CardFooter className="flex justify-start">
