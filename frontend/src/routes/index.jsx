@@ -9,6 +9,8 @@ const LoginPage = lazy(() => import("@/pages/login"));
 const HistoryPage = lazy(() => import("@/pages/history"));
 const SegmentImagePage = lazy(() => import("@/pages/segment-image"));
 const GenerateImagePage = lazy(() => import("@/pages/generate-image"));
+const ImageToVideoPage = lazy(() => import("@/pages/image-to-video"));
+const PictureAdsPage = lazy(() => import("@/pages/picture-ads"));
 
 const MainRouter = () => {
   return (
@@ -32,6 +34,11 @@ const MainRouter = () => {
               element={<SegmentImagePage />}
               path={RouteName.SEGMENT_IMAGE}
             />
+            <Route
+              element={<ImageToVideoPage />}
+              path={RouteName.IMAGE_TO_VIDEO}
+            />
+            <Route element={<PictureAdsPage />} path={RouteName.PICTURE_ADS} />
           </Route>
         </Route>
 

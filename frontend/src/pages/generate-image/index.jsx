@@ -230,6 +230,7 @@ function GenerateImagePage() {
       formData.append("model", editData.model);
       formData.append("size", editData.size);
       formData.append("output_format", editData.output_format);
+      formData.append("quality", editData.quality);
 
       if (editData.output_compression !== null) {
         formData.append("output_compression", editData.output_compression);
@@ -314,6 +315,7 @@ function GenerateImagePage() {
         output_format: "png",
         output_compression: 0,
         image: mainImage.file,
+        quality: quality,
       };
 
       if (maskImage) {

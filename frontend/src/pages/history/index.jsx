@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,7 +13,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { format } from "date-fns";
-import { history } from "@/services/history";
+import { history, deleteImage } from "@/services/history"; // Thêm deleteImage function
 import {
   Loader2,
   Calendar,
@@ -21,19 +21,50 @@ import {
   PlusCircle,
   Camera,
   Video,
+  X,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 const History = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState(null);
+
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["history", currentPage],
     queryFn: () => history(currentPage),
     keepPreviousData: true,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (imageId) => deleteImage(imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["history", currentPage]);
+
+      if (selectedImage && selectedImage.id === imageToDelete.id) {
+        setSelectedImage(null);
+      }
+
+      toast.success("The image has been successfully deleted!");
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete image: ${error.message}`);
+    },
   });
 
   const historyData = data || {
@@ -83,6 +114,21 @@ const History = () => {
 
   const handleSelectImage = (image) => {
     setSelectedImage(image);
+  };
+
+  const handleDeleteClick = (e, image) => {
+    e.stopPropagation(); // Prevent triggering card selection
+    setImageToDelete(image);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (imageToDelete) {
+      toast.info("Deleting image...");
+      deleteMutation.mutate(imageToDelete.id);
+      setDeleteDialogOpen(false);
+      setImageToDelete(null);
+    }
   };
 
   if (error) {
@@ -136,13 +182,22 @@ const History = () => {
                 {historyData.items.map((item) => (
                   <Card
                     key={item.id}
-                    className={`overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer ${
+                    className={`overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer relative ${
                       selectedImage && selectedImage.id === item.id
                         ? "ring-2 ring-primary ring-offset-2"
                         : ""
                     }`}
                     onClick={() => handleSelectImage(item)}
                   >
+                    {/* Delete Button - Positioned Absolutely */}
+                    <div
+                      className="absolute top-2 right-3 z-50 "
+                      onClick={(e) => handleDeleteClick(e, item)}
+                      aria-label="Delete image"
+                    >
+                      <X className="h-5 w-5 text-black" />
+                    </div>
+
                     <div className="flex">
                       <div className="w-1/3">
                         <div className="relative h-full">
@@ -150,6 +205,7 @@ const History = () => {
                             src={item.gcs_public_url}
                             alt={`Generated image for ${item.prompt}`}
                             className="h-full w-full object-cover aspect-square"
+                            loading="lazy"
                           />
                           <div className="absolute bottom-2 left-2">
                             <Badge className="bg-background/80 backdrop-blur-sm text-foreground">
@@ -254,7 +310,7 @@ const History = () => {
       </div>
 
       {/* Right Panel - Generation Interface */}
-      <div className={`w-1/3  sticky top-0`}>
+      <div className={`w-1/3 sticky top-0`}>
         <div className="flex flex-col h-full p-6">
           <div className="flex-1 flex flex-col items-center justify-center gap-6">
             {selectedImage ? (
@@ -265,6 +321,18 @@ const History = () => {
                     alt={selectedImage.prompt.substring(0, 30) + "..."}
                     className="w-full h-auto max-w-xs mx-auto"
                   />
+
+                  {/* Delete button for selected image */}
+                  <Button
+                    className="absolute top-2 right-2 bg-black/70 hover:bg-destructive text-white hover:text-white p-2 rounded-full shadow-md"
+                    onClick={() => {
+                      setImageToDelete(selectedImage);
+                      setDeleteDialogOpen(true);
+                    }}
+                    aria-label="Delete image"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
                 <div className="max-w-xs mx-auto">
                   <Badge variant="outline" className="mb-3">
@@ -315,6 +383,61 @@ const History = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xác nhận xóa</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn xóa hình ảnh này? Hành động này không thể
+              hoàn tác.
+            </DialogDescription>
+          </DialogHeader>
+
+          {imageToDelete && (
+            <div className="flex items-center space-x-4 my-4">
+              <img
+                src={imageToDelete.gcs_public_url}
+                alt="Image to delete"
+                className="w-20 h-20 object-cover rounded-md"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium">{imageToDelete.model}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {imageToDelete.prompt}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteMutation.isLoading}
+            >
+              {deleteMutation.isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xóa...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Xóa ảnh
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

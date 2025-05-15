@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import React, { useState, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,22 +14,29 @@ const SingleImageUpload = ({
   onMaskCreated,
   onImageCreated,
 }) => {
-  const mainImageInputRef = useRef(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 
-  const triggerMainImageUpload = () => {
-    mainImageInputRef.current.click();
-  };
+  const onDrop = useCallback(
+    (acceptedFiles) => {
+      if (acceptedFiles && acceptedFiles[0]) {
+        const file = acceptedFiles[0];
+        onMainImageUpload({
+          file,
+          preview: URL.createObjectURL(file),
+        });
+      }
+    },
+    [onMainImageUpload]
+  );
 
-  const handleMainImageUpload = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      onMainImageUpload({
-        file,
-        preview: URL.createObjectURL(file),
-      });
-    }
-  };
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "image/*": [],
+    },
+    maxSize: 10485760, // 10MB
+    maxFiles: 1,
+  });
 
   const handleSaveImage = async (editedFile) => {
     if (editedFile) {
@@ -104,21 +112,17 @@ const SingleImageUpload = ({
         const b = data[i + 2];
 
         if (r > 240 && g > 240 && b > 240) {
-          // Vùng đã vẽ (trắng) -> chuyển thành đen đặc (mask)
-          data[i] = 0; // R = 0
-          data[i + 1] = 0; // G = 0
-          data[i + 2] = 0; // B = 0
-          data[i + 3] = 255; // Alpha = 255 (đặc)
+          data[i] = 0;
+          data[i + 1] = 0;
+          data[i + 2] = 0;
+          data[i + 3] = 255;
         } else {
-          // Vùng không vẽ -> transparent hoàn toàn
-          data[i + 3] = 0; // Alpha = 0 (trong suốt)
+          data[i + 3] = 0;
         }
       }
 
-      // Ghi dữ liệu trở lại canvas
       ctx.putImageData(imageData, 0, 0);
 
-      // Chuyển canvas thành file
       canvas.toBlob((blob) => {
         const maskFile = new File([blob], "mask-image.png", {
           type: "image/png",
@@ -176,25 +180,25 @@ const SingleImageUpload = ({
             </div>
           ) : (
             <div
-              className="flex flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/50 p-10 cursor-pointer hover:bg-accent/50 transition-colors"
-              onClick={triggerMainImageUpload}
+              {...getRootProps()}
+              className={`flex flex-col cursor-pointer items-center justify-center rounded-md border-2 border-dashed p-10 transition-colors ${
+                isDragActive
+                  ? "border-primary bg-primary/10"
+                  : "border-muted-foreground/50 hover:bg-accent/50"
+              }`}
             >
+              <input {...getInputProps()} />
               <Upload className="h-10 w-10 text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">
-                Drag and drop or click to upload main image
+                {isDragActive
+                  ? "Drag 'n' drop the files here ..."
+                  : "Click to select files or drag and drop"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 PNG, JPG up to 10MB
               </p>
             </div>
           )}
-          <input
-            ref={mainImageInputRef}
-            type="file"
-            className="hidden"
-            onChange={handleMainImageUpload}
-            accept="image/*"
-          />
         </CardContent>
       </Card>
 
@@ -210,10 +214,10 @@ const SingleImageUpload = ({
           maxCanvasHeight="70vh"
           maxCanvasWidth="70vw"
           labels={{
-            close: "Cancel",
-            save: "Save",
-            reset: "Reset photo",
-            draw: "Draw",
+            close: "Hủy",
+            save: "Lưu",
+            reset: "Đặt lại ảnh",
+            draw: "Vẽ",
             brushColor: "Màu vẽ",
             brushWidth: "Độ rộng nét vẽ",
           }}

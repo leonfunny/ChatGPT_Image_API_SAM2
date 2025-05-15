@@ -10,4 +10,12 @@ const history = async (page = 1, size = 10) => {
   return response?.data;
 };
 
-export { history };
+const deleteImage = async (imageId) => {
+  const response = await Request({
+    method: HTTP_METHOD.DELETE,
+    url: `${HOST.history}/${imageId}`,
+  });
+  return response?.data;
+};
+
+export { history, deleteImage };

@@ -4,4 +4,6 @@ export const RouteName = {
   GENERATE_IMAGE: "generate-image",
   HISTORY: "history",
   SEGMENT_IMAGE: "segment-image",
+  IMAGE_TO_VIDEO: "image-to-video",
+  PICTURE_ADS: "picture-ads",
 };

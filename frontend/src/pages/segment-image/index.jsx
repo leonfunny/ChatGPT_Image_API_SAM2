@@ -191,7 +191,7 @@ const ImageSegmentationApp = () => {
         ? urlObj.pathname.substring(1)
         : urlObj.pathname;
 
-      await axios.delete("http://localhost:8000/api/v1/images", {
+      await axios.delete(`${BASE_API_URL}/images`, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${access_token}`,
@@ -270,21 +270,15 @@ const ImageSegmentationApp = () => {
       formData.append("model", model);
       formData.append("size", imageSize);
       formData.append("output_format", "png");
-
       formData.append("image_url", imageUrl);
 
       if (processedImage) {
         const response = await fetch(processedImage);
         const blob = await response.blob();
 
-        const reader = new FileReader();
+        const maskFile = new File([blob], "mask.png", { type: "image/png" });
 
-        const base64Data = await new Promise((resolve) => {
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(blob);
-        });
-
-        formData.append("mask_base64", base64Data);
+        formData.append("mask_file", maskFile);
       }
 
       const response = await axios.post(

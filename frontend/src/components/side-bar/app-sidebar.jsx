@@ -5,6 +5,8 @@ import {
   Send,
   PaintbrushVertical,
   SquareDashedMousePointer,
+  FileVideo,
+  ImagePlus,
 } from "lucide-react";
 
 import { NavMain } from "@/components/side-bar/nav-main";
@@ -40,6 +42,16 @@ const data = {
       title: "Auto Segment Image",
       url: "segment-image",
       icon: SquareDashedMousePointer,
+    },
+    {
+      title: "Image to Video",
+      url: "image-to-video",
+      icon: FileVideo,
+    },
+    {
+      title: "Picture Ads",
+      url: "picture-ads",
+      icon: ImagePlus,
     },
   ],
   navSecondary: [

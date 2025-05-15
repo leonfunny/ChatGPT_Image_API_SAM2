@@ -1,4 +1,5 @@
-import React, { useRef } from "react";
+import React, { useRef, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { X, Plus } from "lucide-react";
@@ -8,15 +9,29 @@ const MultipleImageUpload = ({
   onImageUpload,
   onImageRemove,
 }) => {
-  // Create ref for the file input
   const multipleImagesInputRef = useRef(null);
 
-  // Function to trigger the file input
-  const triggerMultipleImageUpload = () => {
-    multipleImagesInputRef.current.click();
-  };
+  const onDrop = useCallback(
+    (acceptedFiles) => {
+      if (acceptedFiles && acceptedFiles.length) {
+        const newImages = acceptedFiles.map((file) => ({
+          file,
+          preview: URL.createObjectURL(file),
+        }));
+        onImageUpload(newImages);
+      }
+    },
+    [onImageUpload]
+  );
 
-  // Handle the file input change
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "image/*": [],
+    },
+    maxSize: 10485760, // 10MB
+  });
+
   const handleMultipleImageUpload = (e) => {
     if (e.target.files && e.target.files.length) {
       const files = Array.from(e.target.files);
@@ -29,13 +44,23 @@ const MultipleImageUpload = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div
+      {...getRootProps({
+        className: `space-y-4 ${isDragActive ? "relative" : ""}`,
+      })}
+    >
       <Label>Upload Multiple Images</Label>
+
+      {isDragActive && (
+        <div className="absolute inset-0 bg-primary/20 border-2 border-primary border-dashed rounded-lg flex items-center justify-center z-10"></div>
+      )}
+
       <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
         {uploadedImages.map((image, index) => (
           <div
             key={index}
             className="relative rounded-md overflow-hidden bg-muted group"
+            onClick={(e) => e.stopPropagation()} // Prevent triggering the dropzone
           >
             <img
               src={image.preview}
@@ -46,7 +71,10 @@ const MultipleImageUpload = ({
               variant="destructive"
               size="icon"
               className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-70 hover:opacity-100"
-              onClick={() => onImageRemove(index)}
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent triggering the dropzone
+                onImageRemove(index);
+              }}
             >
               <X className="h-3 w-3" />
             </Button>
@@ -57,7 +85,9 @@ const MultipleImageUpload = ({
         ))}
         <div
           className="flex flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/50 p-4 h-24 cursor-pointer hover:bg-accent/50 transition-colors"
-          onClick={triggerMultipleImageUpload}
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent triggering the dropzone
+          }}
         >
           <Plus className="h-8 w-8 text-muted-foreground mb-1" />
           <p className="text-xs text-muted-foreground text-center">
@@ -65,6 +95,9 @@ const MultipleImageUpload = ({
           </p>
         </div>
       </div>
+
+      <input {...getInputProps()} />
+
       <input
         ref={multipleImagesInputRef}
         type="file"
@@ -73,6 +106,10 @@ const MultipleImageUpload = ({
         accept="image/*"
         multiple
       />
+
+      <p className="text-xs text-muted-foreground mt-1">
+        Drag and drop multiple images here, or click to select images. PNG, JPG
+      </p>
     </div>
   );
 };

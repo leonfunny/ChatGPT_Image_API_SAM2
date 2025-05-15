@@ -8,5 +8,10 @@ export const HOST = {
   editURLImage: "generate/edit-from-url",
   batchEditImage: "generate/batch-edit",
   history: "generate/history",
+  deleteHistory: "generate/history",
   upload: "upload",
+  uploadVideo: "upload-video",
+  generateVideo: "generate/video",
+  generateTextToVideo: "generate/text-to-video",
+  promptGenerating: "picture-ads/prompt-generating",
 };
