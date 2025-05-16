@@ -9,9 +9,15 @@ from api.v1.services.auth import (
 )
 from core.config import settings
 from core.database import DbSession
-from core.security import create_token, verify_token
+from core.security import create_token, verify_token_str
 from models.user import User
-from api.v1.schemas.auth import RegisterRequest, Token, LoginRequest, UserResponse
+from api.v1.schemas.auth import (
+    RegisterRequest,
+    Token,
+    LoginRequest,
+    UserResponse,
+    RefreshTokenRequest,
+)
 
 
 router = APIRouter()
@@ -33,7 +39,7 @@ async def login_for_access_token(db: DbSession, payload: LoginRequest) -> Token:
         )
 
     access_token = create_token(
-        subject= user.email,
+        subject=user.email,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     refresh_token = create_token(
@@ -44,8 +50,8 @@ async def login_for_access_token(db: DbSession, payload: LoginRequest) -> Token:
 
 
 @router.post("/refresh-token", response_model=Token)
-async def refresh_token(db: DbSession, token: str) -> Token:
-    email = verify_token(token)
+async def refresh_token(db: DbSession, payload: RefreshTokenRequest) -> Token:
+    email = verify_token_str(payload.token)
     user = await get_user(db, email)
     if not user:
         raise HTTPException(
@@ -55,7 +61,7 @@ async def refresh_token(db: DbSession, token: str) -> Token:
         )
 
     access_token = create_token(
-        subject= user.email,
+        subject=user.email,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     refresh_token = create_token(
@@ -77,11 +83,11 @@ async def register_user(db: DbSession, payload: RegisterRequest) -> Token:
     user = await create_user(db, payload)
 
     access_token = create_token(
-        subject= user.email,
+        subject=user.email,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     refresh_token = create_token(
-        subject= user.email,
+        subject=user.email,
         expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
 
