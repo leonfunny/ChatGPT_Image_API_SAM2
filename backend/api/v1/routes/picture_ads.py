@@ -50,8 +50,8 @@ class VariationResponse(GeneralModel):
     id: str
     status: str
     created_at: str
-    generated_images: Optional[List[Dict[str, Any]]] = None
-    error: Optional[str] = None
+    generated_images: str = ""
+    error: Optional[str] = ""
 
 
 @router.post("/prompt-generating", response_model=dict)
@@ -164,18 +164,25 @@ async def get_variation_result(
 ):
     try:
         result = await leonardo_service.get_variation(variation_id)
-        variation_data = result.get("variation", {})
-
+        generated_image_variation_generic = result.get("generated_image_variation_generic", {})
+        
+        if not generated_image_variation_generic:
+            return {
+                "id": variation_id,
+                "status": "PENDING", 
+                "created_at": "",
+                "generated_images": "", 
+            }
+            
+        variation_data = generated_image_variation_generic[0]
+        url = variation_data.get("url", "")
+        
         response = {
             "id": variation_data.get("id", ""),
-            "status": variation_data.get("status", ""),
+            "status": variation_data.get("status", "PENDING"),
             "created_at": variation_data.get("createdAt", ""),
-            "generated_images": variation_data.get("generatedImages", []),
-            "error": None,
+            "generated_images": url if isinstance(url, str) else ""
         }
-
-        if "error" in variation_data:
-            response["error"] = variation_data["error"]
 
         return response
     except Exception as e:

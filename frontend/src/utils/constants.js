@@ -143,3 +143,11 @@ export const colorThemeOptions = [
   { name: "Vibrant", id: "f84bbf31-1d72-415d-ae4c-deb4b18fccba" },
   { name: "Warm", id: "d838fb14-9719-44f3-877e-da70d072b79c" },
 ];
+
+export const templateFacebookString = `You are a social media expert with many years of experience, please write caption, headline, description in {language} for facebook ads with the above photo and this product description: "{prompt input}" Note to write caption maximum 100-200 words, try to write carefully the first 3 lines because it is extremely important → need strong hook (question, problem, benefit) Use emoji to create highlights If the caption is long, divide it into short paragraphs, avoid writing 1 long block return in json format with caption headlines description:
+{ "caption": "....................", 
+   "headlines": "....................", 
+   "description": "....................." 
+}`;
+
+export const templateInstagramString = `you are a social media expert with many years of experience, please write caption in {language} for instagram with the above photo and this product description: "{prompt input}"Note to write caption maximum 100-150 words, Caption should have:Strong first hook (question, compelling statement).Specific information or emotion (why is the product worth caring about?).Hashtags – help increase reachUse 5–15 relevant hashtags (don't spam 30).Incorporate:Brand hashtag:Product hashtag:Market hashtag:return in json format with caption headlines description{"caption": "...................."} `;

@@ -479,9 +479,9 @@ const PictureAdsTab = () => {
                 <Button
                   onClick={processImageWithAllIdeas}
                   disabled={generating}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  className="text-white"
                 >
-                  {generating ? "Processing..." : "Generate All Image"}
+                  {generating ? "Processing..." : "Generate Image"}
                 </Button>
               </div>
             </div>
@@ -501,7 +501,11 @@ const PictureAdsTab = () => {
             )}
 
             {generatedBanners.length > 0 && (
-              <ImageGenerateResult generatedBanners={generatedBanners} />
+              <ImageGenerateResult
+                generatedBanners={generatedBanners}
+                promptInput={promptInput}
+                language={language}
+              />
             )}
           </CardContent>
           <CardFooter className="flex justify-start">
