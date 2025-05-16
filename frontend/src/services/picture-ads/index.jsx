@@ -6,6 +6,9 @@ const promptGenerating = async (data) => {
   const response = await Request({
     method: HTTP_METHOD.POST,
     url: HOST.promptGenerating,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
     data: data,
   });
   return response?.data;
@@ -15,6 +18,18 @@ const editImage = async (data) => {
   const response = await Request({
     method: HTTP_METHOD.POST,
     url: HOST.pictureAdsGenerate,
+    data: data,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response?.data;
+};
+
+const editMergeImage = async (data) => {
+  const response = await Request({
+    method: HTTP_METHOD.POST,
+    url: HOST.pictureAdsMergeGenerate,
     data: data,
     headers: {
       "Content-Type": "multipart/form-data",
@@ -40,4 +55,10 @@ const upscaleVariation = async (requestId) => {
   return response?.data;
 };
 
-export { promptGenerating, editImage, upscaleImage, upscaleVariation };
+export {
+  promptGenerating,
+  editImage,
+  editMergeImage,
+  upscaleImage,
+  upscaleVariation,
+};

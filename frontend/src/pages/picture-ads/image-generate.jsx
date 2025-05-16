@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useRef } from "react";
-import { Download, Loader2, Copy, Check } from "lucide-react";
+import { Download, Loader2, Copy, Check, ImageUpscale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -135,7 +135,9 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
       }`;
 
       const prompt = templateFacebookString;
-      const responseData = await promptGenerating(JSON.stringify({ prompt }));
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+      const responseData = await promptGenerating(formData);
 
       if (responseData && responseData.content) {
         let jsonContent;
@@ -181,7 +183,9 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
 
       const templateInstagramString = `You are a social media expert with many years of experience, please write caption in ${language} for instagram with the above photo and this product description: "${promptInput}" Note to write caption maximum 100-150 words, Caption should have: Strong first hook (question, compelling statement). Specific information or emotion (why is the product worth caring about?). Hashtags – help increase reach Use 5–15 relevant hashtags (don't spam 30). Incorporate: Brand hashtag: Product hashtag: Market hashtag: return in json format with caption headlines description { "caption": "...................." }`;
       const prompt = templateInstagramString;
-      const responseData = await promptGenerating(JSON.stringify({ prompt }));
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+      const responseData = await promptGenerating(formData);
       if (responseData && responseData.content) {
         let jsonContent;
         try {
@@ -213,58 +217,6 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
       setLoadingSocialMedia((prev) => ({
         ...prev,
         [banner.id + "-instagram"]: false,
-      }));
-    }
-  };
-
-  const generateTiktokContent = async (banner) => {
-    try {
-      const bannerId = banner.id;
-      setLoadingSocialMedia((prev) => ({
-        ...prev,
-        [bannerId + "-tiktok"]: true,
-      }));
-
-      const templateTiktokString = `You are a social media expert with many years of experience, please write caption in ${language} for TikTok with the above photo and this product description: "${promptInput}" Note: TikTok captions should be short, catchy, and engaging (max 100 characters). Include 2-3 relevant hashtags. Focus on trends and challenges. Return in JSON format: { "caption": "...................." }`;
-
-      const prompt = templateTiktokString;
-
-      const responseData = await promptGenerating(JSON.stringify({ prompt }));
-
-      if (responseData && responseData.content) {
-        // Extract JSON from content if needed
-        let jsonContent;
-        try {
-          // Try to extract JSON from the content
-          const jsonMatch = responseData.content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            jsonContent = JSON.parse(jsonMatch[0]);
-          } else {
-            jsonContent = JSON.parse(responseData.content);
-          }
-        } catch (e) {
-          // If parsing fails, use the raw content
-          jsonContent = { rawContent: responseData.content };
-        }
-
-        setSocialMediaContent((prev) => ({
-          ...prev,
-          [bannerId + "-tiktok"]: jsonContent,
-        }));
-
-        toast.success("TikTok content generated successfully");
-      } else {
-        throw new Error("Invalid response format from API");
-      }
-    } catch (error) {
-      toast.error(
-        "Failed to generate TikTok content: " +
-          (error.message || "Unknown error")
-      );
-    } finally {
-      setLoadingSocialMedia((prev) => ({
-        ...prev,
-        [banner.id + "-tiktok"]: false,
       }));
     }
   };
@@ -473,9 +425,12 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
 
                   <div className="space-y-4">
                     <div>
-                      <h5 className="text-sm font-medium mb-2">
+                      <h4 className="text-sm font-medium">
                         Social Media Options
-                      </h5>
+                      </h4>
+                      <p className="text-xs text-gray-500 mb-2">
+                        (If there is no data, please generate again.)
+                      </p>
                       <div className="flex items-center gap-2">
                         <Button
                           variant={
@@ -508,7 +463,7 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
                           size="sm"
                           className={`flex items-center gap-1.5 ${
                             socialMediaContent[banner.id + "-instagram"]
-                              ? "bg-purple-600 hover:bg-purple-700"
+                              ? "bg-[#E1306C] hover:bg-[#E1306C]"
                               : ""
                           }`}
                           onClick={() => generateInstagramContent(banner)}
@@ -535,8 +490,7 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
                               ? "bg-black hover:bg-gray-800"
                               : ""
                           }`}
-                          onClick={() => generateTiktokContent(banner)}
-                          disabled={loadingSocialMedia[banner.id + "-tiktok"]}
+                          disabled={true}
                         >
                           {loadingSocialMedia[banner.id + "-tiktok"] ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
@@ -557,6 +511,7 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
                           onClick={() => handleUpscale(banner)}
                           disabled={upscalingImages[banner.id]}
                         >
+                          <ImageUpscale />
                           {upscalingImages[banner.id] ? (
                             <>
                               <Loader2 className="mr-1 h-3 w-3 animate-spin" />

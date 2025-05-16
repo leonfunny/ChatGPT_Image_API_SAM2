@@ -1,6 +1,6 @@
 import base64
 import io
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 import uuid
 from api.v1.schemas.base import GeneralModel
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -55,21 +55,37 @@ class VariationResponse(GeneralModel):
 
 
 @router.post("/prompt-generating", response_model=dict)
-async def generate_prompt(payload: PromptInput):
+async def generate_prompt_with_files(
+    prompt: str = Form(...),
+    images: List[UploadFile] = File([]),
+):
     try:
-        response = await client.responses.create(
-            model="gpt-4.1",
-            input=payload.prompt,
+        content = [{"type": "text", "text": prompt}]
+
+        for image in images:
+            contents = await image.read()
+            base64_image = base64.b64encode(contents).decode("utf-8")
+
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{image.content_type};base64,{base64_image}"
+                    },
+                }
+            )
+
+        completion = await client.chat.completions.create(
+            model="gpt-4.1", messages=[{"role": "user", "content": content}]
         )
 
         response_dict = {
-            "id": response.id,
-            "created_at": response.created_at,
-            "model": response.model,
-            "content": response.output[0].content[0].text
-            if response.output and response.output[0].content
+            "id": completion.id,
+            "created_at": completion.created,
+            "model": completion.model,
+            "content": completion.choices[0].message.content
+            if completion.choices
             else "",
-            "status": response.status,
         }
 
         return response_dict
@@ -131,6 +147,63 @@ async def edit_image(
         raise e
 
 
+@router.post("/edit-merge", response_model=ImageResponse)
+async def megre_imanges(
+    prompt: str = Form(...),
+    model: str = Form("gpt-image-1"),
+    size: str = Form("1024x1024"),
+    output_format: str = Form("png"),
+    output_compression: Optional[int] = Form(None),
+    quality: Optional[str] = Form(None),
+    images: List[UploadFile] = File(...),
+):
+    try:
+        if not images or len(images) == 0:
+            raise HTTPException(status_code=400, detail="No images provided")
+
+        image_files = []
+        for image in images:
+            image_data = await image.read()
+            image_file = io.BytesIO(image_data)
+            image_file.name = f"image.{image.filename.split('.')[-1]}"
+            image_files.append(image_file)
+
+        params = prepare_openai_params(
+            model=model,
+            prompt=prompt,
+            size=size,
+            output_format=output_format,
+            output_compression=output_compression,
+            quality=quality,
+        )
+
+        response = await image_service.client.images.edit(image=image_files, **params)
+        result = response.data[0]
+        image_content = base64.b64decode(result.b64_json)
+
+        upload_file = UploadFile(
+            file=io.BytesIO(image_content),
+            filename=f"{uuid.uuid4()}.{output_format}",
+        )
+        upload_file.headers = {"content-type": f"image/{output_format}"}
+
+        gcs_info = await image_storage.upload_image(upload_file)
+        result = {
+            "image_url": gcs_info["url"],
+            "format": output_format,
+        }
+
+        return ImageResponse(**result)
+
+    except OpenAIError as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+
+    except Exception as e:
+        if not isinstance(e, HTTPException):
+            raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise e
+
+
 async def get_leonardo_service():
     return LeonardoService(api_key=settings.LEONARDO_API_KEY)
 
@@ -164,24 +237,26 @@ async def get_variation_result(
 ):
     try:
         result = await leonardo_service.get_variation(variation_id)
-        generated_image_variation_generic = result.get("generated_image_variation_generic", {})
-        
+        generated_image_variation_generic = result.get(
+            "generated_image_variation_generic", {}
+        )
+
         if not generated_image_variation_generic:
             return {
                 "id": variation_id,
-                "status": "PENDING", 
+                "status": "PENDING",
                 "created_at": "",
-                "generated_images": "", 
+                "generated_images": "",
             }
-            
+
         variation_data = generated_image_variation_generic[0]
         url = variation_data.get("url", "")
-        
+
         response = {
             "id": variation_data.get("id", ""),
             "status": variation_data.get("status", "PENDING"),
             "created_at": variation_data.get("createdAt", ""),
-            "generated_images": url if isinstance(url, str) else ""
+            "generated_images": url if isinstance(url, str) else "",
         }
 
         return response

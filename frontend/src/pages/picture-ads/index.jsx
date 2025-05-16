@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Upload, X, ArrowRight } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
@@ -23,16 +23,17 @@ import IdeaCard from "./idea-card";
 import ImageGenerateResult from "./image-generate";
 import GeneratePromptStep from "./generate-prompt";
 import { promptGenerating } from "@/services/picture-ads";
-import { editImage } from "@/services/picture-ads";
+import { editImage, editMergeImage } from "@/services/picture-ads";
 import { extractJsonFromContent } from "@/utils/functions";
+import { toast } from "sonner";
 
 const PictureAdsTab = () => {
   const model = "gpt-image-1";
 
   const [currentStep, setCurrentStep] = useState(1);
   const [promptInput, setPromptInput] = useState("");
+  const [images, setImages] = useState([]);
   const [language, setLanguage] = useState("polish");
-  const [uploadedImages, setUploadedImages] = useState([]);
   const [processing, setProcessing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
@@ -49,29 +50,37 @@ const PictureAdsTab = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const canProceedToGeneration = result && uploadedImages.length > 0;
+  const canProceedToGeneration = result && images.length > 0;
 
   const onDrop = useCallback(
     (acceptedFiles) => {
-      if (uploadedImages.length + acceptedFiles.length > 6) {
-        alert("You can upload maximum 6 images");
-        const allowedFiles = acceptedFiles.slice(0, 6 - uploadedImages.length);
-        const newImages = allowedFiles.map((file) =>
-          Object.assign(file, {
+      if (images.length + acceptedFiles.length > 6) {
+        toast.error("You can upload maximum 6 images");
+        const allowedFiles = acceptedFiles.slice(0, 6 - images.length);
+        const newImages = allowedFiles.map((file) => {
+          const fileWithId = Object.assign(file, {
+            id: `image-${Date.now()}-${Math.random()
+              .toString(36)
+              .substr(2, 9)}`,
             preview: URL.createObjectURL(file),
-          })
-        );
-        setUploadedImages([...uploadedImages, ...newImages]);
+          });
+          return fileWithId;
+        });
+        setImages([...images, ...newImages]);
       } else {
-        const newImages = acceptedFiles.map((file) =>
-          Object.assign(file, {
+        const newImages = acceptedFiles.map((file) => {
+          const fileWithId = Object.assign(file, {
+            id: `image-${Date.now()}-${Math.random()
+              .toString(36)
+              .substr(2, 9)}`,
             preview: URL.createObjectURL(file),
-          })
-        );
-        setUploadedImages([...uploadedImages, ...newImages]);
+          });
+          return fileWithId;
+        });
+        setImages([...images, ...newImages]);
       }
     },
-    [uploadedImages]
+    [images]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -81,11 +90,14 @@ const PictureAdsTab = () => {
     },
   });
 
-  const removeImage = (index) => {
-    const newImages = [...uploadedImages];
-    URL.revokeObjectURL(newImages[index].preview);
-    newImages.splice(index, 1);
-    setUploadedImages(newImages);
+  const removeImage = (idToRemove) => {
+    const imageToRemove = images.find((img) => img.id === idToRemove);
+    if (imageToRemove) {
+      if (imageToRemove.preview) {
+        URL.revokeObjectURL(imageToRemove.preview);
+      }
+      setImages(images.filter((img) => img.id !== idToRemove));
+    }
   };
 
   const handleProcessPrompt = async () => {
@@ -102,7 +114,16 @@ const PictureAdsTab = () => {
         .replace("{prompt input}", promptInput)
         .replace("{language}", language);
 
-      const responseData = await promptGenerating(JSON.stringify({ prompt }));
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+
+      if (images.length > 0) {
+        images.forEach((img) => {
+          formData.append("images", img);
+        });
+      }
+
+      const responseData = await promptGenerating(formData);
 
       if (responseData && responseData.content) {
         const extractedData = extractJsonFromContent(responseData.content);
@@ -130,8 +151,7 @@ const PictureAdsTab = () => {
       return;
     }
 
-    const selectedImage = uploadedImages[0];
-    if (!selectedImage) {
+    if (images.length === 0) {
       alert("Invalid image selection");
       return;
     }
@@ -147,10 +167,9 @@ const PictureAdsTab = () => {
         };
 
         const formData = new FormData();
-        formData.append("image", selectedImage);
         formData.append(
           "prompt",
-          `create me banner from attached image with idea: ${JSON.stringify(
+          `create me banner from attached images with idea: ${JSON.stringify(
             idea
           )}`
         );
@@ -158,12 +177,24 @@ const PictureAdsTab = () => {
         formData.append("quality", quality);
         formData.append("size", imageSize);
 
-        const response = await editImage(formData);
+        if (images.length > 1) {
+          images.forEach((img) => {
+            formData.append("images", img);
+          });
 
-        return {
-          response: response,
-          ideaTitle: title,
-        };
+          const response = await editMergeImage(formData);
+          return {
+            response: response,
+            ideaTitle: title,
+          };
+        } else {
+          formData.append("image", images[0]);
+          const response = await editImage(formData);
+          return {
+            response: response,
+            ideaTitle: title,
+          };
+        }
       });
 
       const results = await Promise.all(promises);
@@ -179,6 +210,30 @@ const PictureAdsTab = () => {
       setError(err.message || "An unexpected error occurred");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      images.forEach((img) => {
+        if (img.preview) URL.revokeObjectURL(img.preview);
+      });
+    };
+  }, [images]);
+
+  const updateIdea = (index, newTitle, newDetails) => {
+    if (result) {
+      // Convert the result object to entries array
+      const resultEntries = Object.entries(result);
+
+      // Update the specific entry
+      resultEntries[index] = [newTitle, newDetails];
+
+      // Convert back to object
+      const updatedResult = Object.fromEntries(resultEntries);
+
+      // Update the state
+      setResult(updatedResult);
     }
   };
 
@@ -255,6 +310,61 @@ const PictureAdsTab = () => {
         </div>
       </div>
 
+      <h3 className="text-lg font-medium text-center mb-2">
+        Upload Product Images
+      </h3>
+      <div
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+          isDragActive
+            ? "border-primary bg-primary/10"
+            : "border-gray-300 hover:border-primary"
+        }`}
+      >
+        <input {...getInputProps()} />
+        <div className="flex flex-col items-center justify-center space-y-2">
+          <Upload className="h-8 w-8 text-gray-400" />
+          <p className="font-medium">
+            {isDragActive
+              ? "Drop images here..."
+              : "Drag and drop images here, or click to select files"}
+          </p>
+          <p className="text-xs text-gray-500">
+            Supports JPG, PNG, GIF (Max 6 images)
+          </p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {images.length > 0 && (
+          <div className="mt-4">
+            <Label className="text-base font-medium">
+              Upload Images ({images.length})
+            </Label>
+            <div className="flex flex-wrap gap-3 mt-3">
+              {images.map((file, index) => (
+                <div key={index} className="relative group">
+                  <div className="aspect-square w-24 rounded-md overflow-hidden bg-gray-100 border">
+                    <img
+                      src={file.preview}
+                      alt={`Reference image ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => removeImage(file.id)}
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Step 1: Product Information */}
       {currentStep === 1 && (
         <GeneratePromptStep
@@ -294,15 +404,19 @@ const PictureAdsTab = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {Object.entries(result).map(([title, details], index) => (
-                    <IdeaCard key={index} title={title} details={details} />
+                    <IdeaCard
+                      key={index}
+                      title={title}
+                      details={details}
+                      onUpdate={updateIdea}
+                    />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Added Banner Configuration Section */}
             <div className="mt-6 bg-gray-50 p-4 rounded-md">
-              <h3 className="text-lg font-medium mb-3">Banner Configuration</h3>
+              <h3 className="text-lg font-medium mb-3">Image Configuration</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="space-y-2">
                   <Label htmlFor="quality" className="text-base font-medium">
@@ -352,65 +466,6 @@ const PictureAdsTab = () => {
                   </Select>
                 </div>
               </div>
-
-              <h3 className="text-lg font-medium mb-2">
-                Upload Product Images
-              </h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Upload up to 6 product images that will be used for banner
-                generation
-              </p>
-
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                  isDragActive
-                    ? "border-primary bg-primary/10"
-                    : "border-gray-300 hover:border-primary"
-                }`}
-              >
-                <input {...getInputProps()} />
-                <div className="flex flex-col items-center justify-center space-y-2">
-                  <Upload className="h-8 w-8 text-gray-400" />
-                  <p className="font-medium">
-                    {isDragActive
-                      ? "Drop images here..."
-                      : "Drag and drop images here, or click to select files"}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Supports JPG, PNG, GIF (Max 6 images)
-                  </p>
-                </div>
-              </div>
-
-              {uploadedImages.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">
-                    Uploaded Images ({uploadedImages.length}/6)
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                    {uploadedImages.map((file, index) => (
-                      <div key={index} className="relative group">
-                        <div className="aspect-square rounded-md overflow-hidden bg-gray-100 border">
-                          <img
-                            src={file.preview}
-                            alt={`Preview ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => removeImage(index)}
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
@@ -420,9 +475,9 @@ const PictureAdsTab = () => {
             <Button
               onClick={goToNextStep}
               className="px-8"
-              disabled={uploadedImages.length === 0}
+              disabled={images.length === 0}
             >
-              Continue to Banner Generation{" "}
+              Continue to Image Generation
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>
@@ -437,6 +492,21 @@ const PictureAdsTab = () => {
             <CardDescription>
               Generate banners using idea and images
             </CardDescription>
+            {result && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {Object.entries(result).map(([title, details], index) => (
+                    <IdeaCard
+                      key={index}
+                      title={title}
+                      details={details}
+                      onUpdate={updateIdea}
+                      index={index}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="bg-gray-50 rounded-lg p-4">
@@ -465,13 +535,6 @@ const PictureAdsTab = () => {
                       }
                     </p>
                   </div>
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-lg font-medium mb-2">Images</h3>
-                  <p className="text-sm mb-2">
-                    {uploadedImages.length} image(s) uploaded
-                  </p>
                 </div>
               </div>
 

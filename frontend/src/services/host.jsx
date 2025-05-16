@@ -15,6 +15,7 @@ export const HOST = {
   generateTextToVideo: "generate/text-to-video",
   promptGenerating: "picture-ads/prompt-generating",
   pictureAdsGenerate: "picture-ads/edit",
+  pictureAdsMergeGenerate: "picture-ads/edit-merge",
   upscaleImage: "picture-ads/upscale-from-gcs",
   upscaleVariation: "picture-ads/upscale/variations",
 };
