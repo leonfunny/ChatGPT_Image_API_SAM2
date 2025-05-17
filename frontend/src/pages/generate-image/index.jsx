@@ -38,6 +38,8 @@ import { useMutation } from "@tanstack/react-query";
 import SingleImageUpload from "./single-upload";
 import MultipleImageUpload from "./multiple-upload";
 import { generate, editImage, batchEditImage } from "@/services/generate-image";
+import { download } from "@/services/upload";
+import { toast } from "sonner";
 
 function GenerateImagePage() {
   const [prompt, setPrompt] = useState("");
@@ -338,27 +340,22 @@ function GenerateImagePage() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (resultImage) {
-      try {
-        let fileName = "generated-image-" + Date.now() + ".png";
-        const urlParts = resultImage.split("/");
-        if (urlParts.length > 0) {
-          const lastPart = urlParts[urlParts.length - 1];
-          if (lastPart.includes(".")) {
-            fileName = lastPart;
-          }
-        }
+      toast.info("Downloading Image. Please wait...");
 
-        const link = document.createElement("a");
-        link.href = resultImage;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (error) {
-        setError("Failed to download the image: " + error.message);
-      }
+      await download(resultImage);
+      const blob = await download(resultImage);
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = blobUrl;
+      a.download = `image-${Date.now()}.png`;
+      document.body.appendChild(a);
+
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
     }
   };
 
@@ -674,7 +671,7 @@ function GenerateImagePage() {
                 <div className="flex space-x-2 w-full">
                   <Button
                     variant="secondary"
-                    className="flex-1"
+                    className="flex-1 cursor-pointer"
                     onClick={handleDownload}
                   >
                     <Download className="mr-2 h-4 w-4" />
