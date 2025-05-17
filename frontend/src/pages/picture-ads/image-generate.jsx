@@ -420,11 +420,13 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
               className="overflow-hidden hover:shadow-md transition-all"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-                <div className="aspect-video w-full overflow-hidden rounded-md">
+                <div className="w-full overflow-hidden rounded-md">
                   <img
                     src={getImageToDisplay(banner)}
                     alt={`Banner for ${banner.idea}`}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform"
+                    className="w-full h-auto object-contain"
+                    style={{ aspectRatio: "auto" }}
+                    loading="lazy"
                   />
                 </div>
                 <div>

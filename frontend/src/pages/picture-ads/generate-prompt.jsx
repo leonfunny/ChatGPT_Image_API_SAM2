@@ -26,16 +26,21 @@ const GeneratePromptStep = ({
   setLanguage,
   onContinue,
   processing,
+  images,
 }) => {
+  // Check if we can proceed with generation (need either prompt or images)
+  const canProceed =
+    promptInput.trim().length > 0 || (images && images.length > 0);
+
   return (
     <Card className="border-2 border-primary/70">
       <CardHeader>
-        <CardTitle>Step 1: Generate Prompt</CardTitle>
+        <CardTitle>Step 1: Generate Ideas</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="prompt_input" className="text-base font-medium">
-            Prompt Input
+            Prompt Input (optional if images are uploaded)
           </Label>
           <Textarea
             id="prompt_input"
@@ -68,7 +73,7 @@ const GeneratePromptStep = ({
         <Button
           onClick={onContinue}
           className="px-8"
-          disabled={processing || !promptInput.trim()}
+          disabled={processing || !canProceed}
         >
           {processing ? "Generating Ideas..." : "Generate Ideas"}{" "}
           <ArrowRight className="ml-2 h-4 w-4" />

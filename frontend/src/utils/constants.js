@@ -323,3 +323,6 @@ export const templateFacebookString = `You are a social media expert with many y
 }`;
 
 export const templateInstagramString = `you are a social media expert with many years of experience, please write caption in {language} for instagram with the above photo and this product description: "{prompt input}"Note to write caption maximum 100-150 words, Caption should have:Strong first hook (question, compelling statement).Specific information or emotion (why is the product worth caring about?).Hashtags – help increase reachUse 5–15 relevant hashtags (don't spam 30).Incorporate:Brand hashtag:Product hashtag:Market hashtag:return in json format with caption headlines description{"caption": "...................."} `;
+
+export const autoPrompt =
+  "write me a short description of the full product in the photo, pay attention to describe important details to advertise the product. return as json, just write description, don't write anything else";

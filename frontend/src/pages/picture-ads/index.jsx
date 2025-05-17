@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Upload, X, ArrowRight } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { languages, modelOptions, templateString } from "@/utils/constants";
+import { modelOptions, templateString, autoPrompt } from "@/utils/constants";
 import IdeaCard from "./idea-card";
 import ImageGenerateResult from "./image-generate";
 import GeneratePromptStep from "./generate-prompt";
@@ -39,11 +39,11 @@ const PictureAdsTab = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [generatedBanners, setGeneratedBanners] = useState([]);
-  const [quality, setQuality] = useState("auto");
-  const [imageSize, setImageSize] = useState("auto");
+  const [quality, setQuality] = useState("medium");
+  const [imageSize, setImageSize] = useState("1024x1536");
 
   const goToNextStep = () => {
-    setCurrentStep((prev) => Math.min(prev + 1, 3));
+    setCurrentStep((prev) => Math.min(prev + 1, 2)); // Giới hạn chỉ có 2 step
   };
 
   const goToPreviousStep = () => {
@@ -100,18 +100,16 @@ const PictureAdsTab = () => {
     }
   };
 
-  const handleProcessPrompt = async () => {
-    if (!promptInput.trim()) {
-      alert("Please enter a prompt");
+  const generateIdeasWithPrompt = async (promptText) => {
+    if (!promptText.trim()) {
+      toast.error("No valid prompt to generate ideas");
+      setProcessing(false);
       return;
     }
 
-    setProcessing(true);
-    setError(null);
-
     try {
       const prompt = templateString
-        .replace("{prompt input}", promptInput)
+        .replace("{prompt input}", promptText)
         .replace("{language}", language);
 
       const formData = new FormData();
@@ -127,9 +125,10 @@ const PictureAdsTab = () => {
 
       if (responseData && responseData.content) {
         const extractedData = extractJsonFromContent(responseData.content);
-        setCurrentStep(2);
         if (extractedData) {
           setResult(extractedData);
+          setCurrentStep(2);
+          toast.success("Generated ideas from product description");
         } else {
           throw new Error(
             "AI not generated JSON from response content. Please try again."
@@ -140,19 +139,74 @@ const PictureAdsTab = () => {
       }
     } catch (err) {
       setError(err.message || "An unexpected error occurred");
+      toast.error("Failed to generate ideas");
     } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleProcessPrompt = async () => {
+    if (!promptInput.trim() && images.length === 0) {
+      toast.error("Please enter a prompt or upload images");
+      return;
+    }
+
+    setProcessing(true);
+    setError(null);
+
+    try {
+      if (promptInput.trim()) {
+        await generateIdeasWithPrompt(promptInput);
+      } else if (images.length > 0) {
+        const formData = new FormData();
+        formData.append("prompt", autoPrompt);
+
+        images.forEach((img) => {
+          formData.append("images", img);
+        });
+
+        const responseData = await promptGenerating(formData);
+
+        if (responseData && responseData.content) {
+          let extractedDescription = "";
+
+          try {
+            const jsonResponse = JSON.parse(responseData.content);
+            if (jsonResponse.description) {
+              extractedDescription = jsonResponse.description;
+            } else {
+              extractedDescription = responseData.content
+                .replace(/```json|```/g, "")
+                .trim();
+            }
+          } catch (e) {
+            extractedDescription = responseData.content
+              .replace(/```json|```/g, "")
+              .trim();
+          }
+
+          setPromptInput(extractedDescription);
+
+          await generateIdeasWithPrompt(extractedDescription);
+        } else {
+          throw new Error("Invalid response format from API");
+        }
+      }
+    } catch (err) {
+      setError(err.message || "An unexpected error occurred");
+      toast.error("Failed to generate ideas");
       setProcessing(false);
     }
   };
 
   const processImageWithAllIdeas = async () => {
     if (!result || Object.keys(result).length === 0) {
-      alert("Please generate ideas first");
+      toast.error("Please generate ideas first");
       return;
     }
 
     if (images.length === 0) {
-      alert("Invalid image selection");
+      toast.error("Invalid image selection");
       return;
     }
 
@@ -206,8 +260,10 @@ const PictureAdsTab = () => {
       }));
 
       setGeneratedBanners((prev) => [...prev, ...newBanners]);
+      toast.success("Banners generated successfully!");
     } catch (err) {
       setError(err.message || "An unexpected error occurred");
+      toast.error("Failed to generate banners");
     } finally {
       setGenerating(false);
     }
@@ -223,23 +279,16 @@ const PictureAdsTab = () => {
 
   const updateIdea = (index, newTitle, newDetails) => {
     if (result) {
-      // Convert the result object to entries array
       const resultEntries = Object.entries(result);
-
-      // Update the specific entry
       resultEntries[index] = [newTitle, newDetails];
-
-      // Convert back to object
       const updatedResult = Object.fromEntries(resultEntries);
-
-      // Update the state
       setResult(updatedResult);
     }
   };
 
   return (
     <div className="w-full space-y-6 p-4 max-w-6xl mx-auto">
-      {/* Workflow Progress Indicator */}
+      {/* Workflow Progress Indicator - Chỉ hiển thị 2 steps */}
       <div className="w-full mb-8">
         <div className="flex items-center justify-between">
           <div
@@ -270,7 +319,7 @@ const PictureAdsTab = () => {
             className={`flex flex-col items-center ${
               currentStep >= 2 ? "text-primary" : "text-gray-400"
             }`}
-            onClick={() => setCurrentStep(2)}
+            onClick={() => canProceedToGeneration && setCurrentStep(2)}
           >
             <div
               className={`h-10 w-10 rounded-full flex items-center justify-center border-2 ${
@@ -281,31 +330,9 @@ const PictureAdsTab = () => {
             >
               <span className="font-bold">2</span>
             </div>
-            <span className="mt-2 text-sm font-medium">Creative Ideas</span>
-          </div>
-
-          <div
-            className={`flex-1 h-1 mx-2 ${
-              currentStep >= 3 ? "bg-primary" : "bg-gray-200"
-            }`}
-          ></div>
-
-          <div
-            className={`flex flex-col items-center ${
-              currentStep >= 3 ? "text-primary" : "text-gray-400"
-            }`}
-            onClick={() => canProceedToGeneration && setCurrentStep(3)}
-          >
-            <div
-              className={`h-10 w-10 rounded-full flex items-center justify-center border-2 ${
-                currentStep >= 3
-                  ? "border-primary bg-primary/10"
-                  : "border-gray-200"
-              }`}
-            >
-              <span className="font-bold">3</span>
-            </div>
-            <span className="mt-2 text-sm font-medium">Generate Banners</span>
+            <span className="mt-2 text-sm font-medium">
+              Creative Ideas & Generate
+            </span>
           </div>
         </div>
       </div>
@@ -374,14 +401,18 @@ const PictureAdsTab = () => {
           setLanguage={setLanguage}
           onContinue={handleProcessPrompt}
           processing={processing}
+          images={images}
         />
       )}
 
-      {/* Step 2: Creative Ideas Selection */}
+      {/* Step 2: Creative Ideas Selection và Generate luôn */}
       {currentStep === 2 && (
         <Card className="border-2 border-primary/70">
           <CardHeader>
-            <CardTitle>Step 2: Upload Image</CardTitle>
+            <CardTitle>Step 2: Creative Ideas & Generate</CardTitle>
+            <CardDescription>
+              Review your ad ideas and generate banners
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {processing && (
@@ -408,7 +439,10 @@ const PictureAdsTab = () => {
                       key={index}
                       title={title}
                       details={details}
-                      onUpdate={updateIdea}
+                      onUpdate={(_, newTitle, newDetails) =>
+                        updateIdea(index, newTitle, newDetails)
+                      }
+                      index={index}
                     />
                   ))}
                 </div>
@@ -466,85 +500,15 @@ const PictureAdsTab = () => {
                   </Select>
                 </div>
               </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={goToPreviousStep}>
-              Back to Description
-            </Button>
-            <Button
-              onClick={goToNextStep}
-              className="px-8"
-              disabled={images.length === 0}
-            >
-              Continue to Image Generation
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
-        </Card>
-      )}
 
-      {/* Step 3: Banner Generation */}
-      {currentStep === 3 && (
-        <Card className="border-2 border-primary/70">
-          <CardHeader>
-            <CardTitle>Step 3: Generate Banners</CardTitle>
-            <CardDescription>
-              Generate banners using idea and images
-            </CardDescription>
-            {result && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {Object.entries(result).map(([title, details], index) => (
-                    <IdeaCard
-                      key={index}
-                      title={title}
-                      details={details}
-                      onUpdate={updateIdea}
-                      index={index}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex flex-col md:flex-row gap-4 items-start">
-                <div className="flex-1">
-                  <h3 className="text-lg font-medium mb-2">Configuration</h3>
-                  <div className="space-y-1">
-                    <p className="text-sm">
-                      <span className="font-medium">Language:</span>{" "}
-                      {languages.find((l) => l.value === language)?.label}
-                    </p>
-                    <p className="text-sm">
-                      <span className="font-medium">Quality:</span>{" "}
-                      {
-                        modelOptions[model].qualities.find(
-                          (q) => q.value === quality
-                        )?.label
-                      }
-                    </p>
-                    <p className="text-sm">
-                      <span className="font-medium">Size:</span>{" "}
-                      {
-                        modelOptions[model].sizes.find(
-                          (s) => s.value === imageSize
-                        )?.label
-                      }
-                    </p>
-                  </div>
-                </div>
-              </div>
-
+              {/* Generate Button ngay trong step 2 */}
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   onClick={processImageWithAllIdeas}
-                  disabled={generating}
+                  disabled={generating || !canProceedToGeneration}
                   className="text-white"
                 >
-                  {generating ? "Processing..." : "Generate Image"}
+                  {generating ? "Processing..." : "Generate Banners"}
                 </Button>
               </div>
             </div>
@@ -556,19 +520,16 @@ const PictureAdsTab = () => {
               </div>
             )}
 
-            {error && (
-              <div className="p-4 bg-red-100 text-red-700 rounded-md">
-                <p className="font-medium">Error occurred:</p>
-                <p>{error}</p>
-              </div>
-            )}
-
+            {/* Hiển thị kết quả ngay trong step 2 */}
             {generatedBanners.length > 0 && (
-              <ImageGenerateResult
-                generatedBanners={generatedBanners}
-                promptInput={promptInput}
-                language={language}
-              />
+              <div className="mt-6">
+                <h3 className="text-lg font-medium mb-3">Generated Banners</h3>
+                <ImageGenerateResult
+                  generatedBanners={generatedBanners}
+                  promptInput={promptInput}
+                  language={language}
+                />
+              </div>
             )}
           </CardContent>
           <CardFooter className="flex justify-start">
@@ -577,7 +538,7 @@ const PictureAdsTab = () => {
               onClick={goToPreviousStep}
               disabled={generating}
             >
-              Back to Ideas
+              Back to Description
             </Button>
           </CardFooter>
         </Card>
