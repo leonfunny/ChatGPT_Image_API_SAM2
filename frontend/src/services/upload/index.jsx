@@ -13,5 +13,13 @@ const uploadImageService = async (data) => {
   });
   return response?.data;
 };
-
-export { uploadImageService };
+const download = async (imageUrl) => {
+  const encodedUrl = encodeURIComponent(imageUrl);
+  const response = await Request({
+    method: HTTP_METHOD.GET,
+    url: `${HOST.download}?url=${encodedUrl}`,
+    responseType: "blob",
+  });
+  return response?.data;
+};
+export { uploadImageService, download };

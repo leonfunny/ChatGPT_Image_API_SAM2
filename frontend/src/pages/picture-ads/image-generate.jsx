@@ -10,6 +10,7 @@ import {
   upscaleVariation,
   promptGenerating,
 } from "@/services/picture-ads";
+import { download } from "@/services/upload";
 import {
   SiInstagram,
   SiFacebook,
@@ -385,6 +386,22 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
     return null;
   };
 
+  const handleDownload = async (imageUrl) => {
+    toast.info("Downloading image. Please wait...");
+    const filename = imageUrl.split("/").pop();
+    const blob = await download(imageUrl);
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = blobUrl;
+    a.download = filename || "image.png";
+    document.body.appendChild(a);
+
+    a.click();
+    window.URL.revokeObjectURL(blobUrl);
+    document.body.removeChild(a);
+  };
+
   return (
     <div>
       <div>
@@ -529,7 +546,7 @@ const ImageGenerateResult = ({ generatedBanners, promptInput, language }) => {
                         size="sm"
                         className="text-xs"
                         onClick={() =>
-                          window.open(getImageToDisplay(banner), "_blank")
+                          handleDownload(getImageToDisplay(banner))
                         }
                       >
                         <Download className="h-4 w-4 mr-1" /> Download

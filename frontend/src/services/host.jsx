@@ -1,6 +1,7 @@
 export const HOST = {
   me: "auth/me",
   login: "auth/token",
+  download: "download",
   refresh: "auth/refresh-token",
   register: "auth/register",
   generate: "generate",
