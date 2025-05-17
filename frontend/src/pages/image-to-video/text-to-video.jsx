@@ -292,9 +292,19 @@ const LeonardoTextToVideo = () => {
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {vibeOptions.map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                        </SelectItem>
+                        <div
+                          key={option.id}
+                          className="flex items-center w-auto h-auto space-x-2 mb-1"
+                        >
+                          <SelectItem value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                          <img
+                            src={option?.img}
+                            alt={option.name}
+                            className="w-20 h-20"
+                          />
+                        </div>
                       ))}
                     </SelectContent>
                   </Select>
@@ -312,9 +322,19 @@ const LeonardoTextToVideo = () => {
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {lightingOptions.map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                        </SelectItem>
+                        <div
+                          key={option.id}
+                          className="flex items-center w-auto h-auto space-x-2 mb-1"
+                        >
+                          <SelectItem value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                          <img
+                            src={option?.img}
+                            alt={option.name}
+                            className="w-20 h-20"
+                          />
+                        </div>
                       ))}
                     </SelectContent>
                   </Select>
@@ -332,9 +352,19 @@ const LeonardoTextToVideo = () => {
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {shotTypeOptions.map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                        </SelectItem>
+                        <div
+                          key={option.id}
+                          className="flex items-center w-auto h-auto space-x-2 mb-1"
+                        >
+                          <SelectItem value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                          <img
+                            src={option?.img}
+                            alt={option.name}
+                            className="w-20 h-20"
+                          />
+                        </div>
                       ))}
                     </SelectContent>
                   </Select>
@@ -352,9 +382,19 @@ const LeonardoTextToVideo = () => {
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {colorThemeOptions.map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                        </SelectItem>
+                        <div
+                          key={option.id}
+                          className="flex items-center w-auto h-auto space-x-2 mb-1"
+                        >
+                          <SelectItem value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                          <img
+                            src={option?.img}
+                            alt={option.name}
+                            className="w-20 h-20"
+                          />
+                        </div>
                       ))}
                     </SelectContent>
                   </Select>

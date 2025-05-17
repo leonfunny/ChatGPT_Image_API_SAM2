@@ -6,8 +6,18 @@ from api.v1.schemas.video import (
     GenerationLeonardoResponse,
     VideoGenerationRequest,
     VideoResponse,
+    # Thêm schema mới nếu cần
+    ImageToVideoRequest,
 )
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    HTTPException,
+    Depends,
+    Form,
+    File,
+    UploadFile,
+)
 import fal_client
 import httpx
 from core.config import settings
@@ -213,3 +223,84 @@ async def get_generation_status(
         result["error"] = "Generation failed"
 
     return result
+
+
+@router.post("/image-to-video", response_model=GenerationLeonardoResponse)
+async def generate_image_to_video(
+    prompt: str = Form(...),
+    image: UploadFile = File(...),
+    client: httpx.AsyncClient = Depends(get_http_client),
+):
+    if not settings.LEONARDO_API_KEY:
+        raise HTTPException(
+            status_code=500, detail="LEONARDO_API_KEY không được thiết lập."
+        )
+
+    # Tải hình ảnh lên Leonardo AI
+
+    image_content = await image.read()
+
+    # Lưu file tạm thời
+    async with NamedTemporaryFile("wb", delete=False) as temp_file:
+        await temp_file.write(image_content)
+        temp_file_name = temp_file.name
+
+    try:
+        # Sử dụng httpx để tải lên file
+        async with httpx.AsyncClient() as upload_client:
+            headers = {"Authorization": f"Bearer {settings.LEONARDO_API_KEY}"}
+            files = {
+                "file": (image.filename, open(temp_file_name, "rb"), image.content_type)
+            }
+
+            upload_url = f"{settings.LEONARDO_API_URL}/upload"
+            upload_response = await upload_client.post(
+                upload_url, headers=headers, files=files
+            )
+
+            if upload_response.status_code != 200:
+                raise HTTPException(
+                    status_code=upload_response.status_code,
+                    detail=f"Lỗi khi tải hình ảnh lên Leonardo AI: {upload_response.text}",
+                )
+
+            upload_result = upload_response.json()
+            image_id = upload_result.get("uploadId")
+
+            if not image_id:
+                raise HTTPException(
+                    status_code=500, detail="Không nhận được uploadId từ phản hồi."
+                )
+    finally:
+        if os.path.exists(temp_file_name):
+            os.unlink(temp_file_name)
+
+    payload = {
+        "imageId": image_id,
+        "prompt": prompt,
+        "frameInterpolation": True,
+        "isPublic": False,
+        "promptEnhance": True,
+    }
+
+    response = await call_leonardo_api(
+        client, "generations-image-to-video", "POST", payload
+    )
+
+    if "error" in response:
+        if response.get("status_code", 500) == 429:
+            raise HTTPException(
+                status_code=429, detail="Rate limit exceeded. Please try again later."
+            )
+        raise HTTPException(
+            status_code=response.get("status_code", 500), detail=response["error"]
+        )
+
+    generation_id = response.get("motionVideoGenerationJob", {}).get("generationId")
+
+    if not generation_id:
+        raise HTTPException(
+            status_code=500, detail="Failed to get generation ID from Leonardo.ai"
+        )
+
+    return GenerationLeonardoResponse(generation_id=generation_id, status="pending")
