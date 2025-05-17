@@ -21,14 +21,14 @@ const AppSelector = () => {
   return (
     <div className="container mx-auto p-4">
       <div className="mb-6 max-w-xs">
-        <h2 className="text-lg font-medium mb-2">Chọn ứng dụng:</h2>
+        <h2 className="text-lg font-medium mb-2">Choose app:</h2>
         <Select defaultValue="image-to-video" onValueChange={handleAppChange}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Chọn ứng dụng" />
+            <SelectValue placeholder="Choose app" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectLabel>Ứng dụng</SelectLabel>
+              <SelectLabel>App</SelectLabel>
               <SelectItem value="image-to-video">Image to Video App</SelectItem>
               <SelectItem value="text-to-video">Text to Video App</SelectItem>
             </SelectGroup>

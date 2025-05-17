@@ -1,14 +1,12 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -18,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Tooltip,
@@ -28,13 +25,14 @@ import {
 } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
 import {
-  Upload,
   RefreshCw,
   CheckCircle,
   XCircle,
   Info,
   Play,
+  ImageIcon,
 } from "lucide-react";
+import { useDropzone } from "react-dropzone";
 import { uploadImageService } from "@/services/upload";
 import { checkStatus, generateVideo } from "@/services/generate-video";
 import { useSelector } from "react-redux";
@@ -65,7 +63,7 @@ const ImagePreview = ({ imageUrl, imageFile }) => {
 
   return (
     <div className="rounded-lg overflow-hidden bg-gray-100 aspect-video">
-      <img src={url} alt="Xem trước" className="w-full h-full object-contain" />
+      <img src={url} alt="Preview" className="w-full h-full object-contain" />
     </div>
   );
 };
@@ -73,22 +71,22 @@ const ImagePreview = ({ imageUrl, imageFile }) => {
 const ProcessStatus = ({ status }) => {
   const statusMap = {
     pending: {
-      label: "Đang chờ xử lý",
+      label: "Pending",
       color: "bg-yellow-500",
       icon: <RefreshCw className="animate-spin h-4 w-4 mr-2" />,
     },
     processing: {
-      label: "Đang tạo video",
+      label: "Creating video",
       color: "bg-blue-500",
       icon: <RefreshCw className="animate-spin h-4 w-4 mr-2" />,
     },
     completed: {
-      label: "Hoàn thành",
+      label: "Completed",
       color: "bg-green-500",
       icon: <CheckCircle className="h-4 w-4 mr-2" />,
     },
     failed: {
-      label: "Thất bại",
+      label: "Failed",
       color: "bg-red-500",
       icon: <XCircle className="h-4 w-4 mr-2" />,
     },
@@ -109,7 +107,6 @@ const ProcessStatus = ({ status }) => {
 const ImageToVideoApp = () => {
   const { access_token } = useSelector((state) => state["feature/user"]);
 
-  const [activeTab, setActiveTab] = useState("upload");
   const [imageFile, setImageFile] = useState(null);
   const [imageUrl, setImageUrl] = useState("");
   const [formData, setFormData] = useState({
@@ -161,12 +158,12 @@ const ImageToVideoApp = () => {
     }
   }, [requestId, access_token]);
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
+  // Auto upload when file is selected
+  useEffect(() => {
+    if (imageFile && !imageUrl && !isUploading) {
+      handleUpload();
     }
-  };
+  }, [imageFile, imageUrl, isUploading]);
 
   const handleUpload = async () => {
     if (imageFile) {
@@ -176,14 +173,29 @@ const ImageToVideoApp = () => {
       try {
         const data = await apiService.uploadImage(imageFile);
         setImageUrl(data.url);
-        setActiveTab("configure");
       } catch (error) {
-        setUploadError(error.message || "Lỗi khi tải ảnh lên");
+        setUploadError(error.message || "Error uploading image");
       } finally {
         setIsUploading(false);
       }
     }
   };
+
+  const onDrop = useCallback((acceptedFiles) => {
+    if (acceptedFiles && acceptedFiles.length > 0) {
+      setImageFile(acceptedFiles[0]);
+      setImageUrl(""); // Reset imageUrl to trigger auto-upload
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "image/*": [],
+    },
+    maxFiles: 1,
+    multiple: false,
+  });
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -195,6 +207,11 @@ const ImageToVideoApp = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!imageUrl) {
+      setUploadError("Please upload an image first");
+      return;
+    }
+
     setIsGenerating(true);
     setGenerateError(null);
 
@@ -205,10 +222,9 @@ const ImageToVideoApp = () => {
       });
 
       setRequestId(data.request_id);
-      setActiveTab("status");
       completedRef.current = false;
     } catch (error) {
-      setGenerateError(error.message || "Lỗi khi tạo video");
+      setGenerateError(error.message || "Error creating video");
     } finally {
       setIsGenerating(false);
     }
@@ -232,98 +248,101 @@ const ImageToVideoApp = () => {
     setRequestId("");
     setStatusData(null);
     completedRef.current = false;
-    setActiveTab("upload");
   };
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <header className="mb-8 text-center">
-        <h1 className="text-3xl font-bold mb-2">Chuyển Đổi Ảnh Thành Video</h1>
+        <h1 className="text-3xl font-bold mb-2">Image to Video Converter</h1>
         <p className="text-gray-500">
-          Sử dụng API Kling 2.0 Master để tạo video từ ảnh với AI
+          Use Kling 2.0 Master API to create videos from images with AI
         </p>
       </header>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="upload">Tải ảnh lên</TabsTrigger>
-          <TabsTrigger value="configure" disabled={!imageUrl && !imageFile}>
-            Cấu hình
-          </TabsTrigger>
-          <TabsTrigger value="status" disabled={!requestId}>
-            Trạng thái
-          </TabsTrigger>
-        </TabsList>
+      <Card>
+        <CardHeader>
+          <CardTitle>Image to Video Conversion</CardTitle>
+          <CardDescription>
+            Upload an image and configure settings to create a video
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-8">
+            {/* Upload Section */}
+            <div className="grid gap-4">
+              <div>
+                <h3 className="text-lg font-medium mb-2">1. Upload Image</h3>
 
-        <TabsContent value="upload">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tải ảnh lên</CardTitle>
-              <CardDescription>
-                Chọn ảnh để chuyển đổi thành video
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-6">
-                <div className="grid gap-2">
-                  <Label htmlFor="image">Tải ảnh lên</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="image"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                    />
-                    <Button
-                      onClick={handleUpload}
-                      disabled={!imageFile || isUploading}
-                    >
-                      {isUploading ? (
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Upload className="h-4 w-4 mr-2" />
-                      )}
-                      Tải lên
-                    </Button>
+                {/* Dedicated Drag and Drop Zone with Auto Upload */}
+                <div
+                  {...getRootProps()}
+                  className={`border-2 border-dashed rounded-lg p-8 mb-4 text-center cursor-pointer transition-colors ${
+                    isDragActive
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-300 hover:border-gray-400"
+                  }`}
+                >
+                  <input {...getInputProps()} />
+                  <div className="flex flex-col items-center gap-3">
+                    {isUploading ? (
+                      <RefreshCw className="h-12 w-12 text-blue-500 animate-spin" />
+                    ) : (
+                      <ImageIcon className="h-12 w-12 text-gray-400" />
+                    )}
+
+                    {isUploading ? (
+                      <p className="text-blue-600 font-medium">
+                        Uploading image...
+                      </p>
+                    ) : isDragActive ? (
+                      <p className="text-blue-600 font-medium">
+                        Drop the image here ...
+                      </p>
+                    ) : imageUrl ? (
+                      <p className="text-green-600 font-medium">
+                        Image uploaded successfully
+                      </p>
+                    ) : (
+                      <p className="font-medium">Drag and drop an image here</p>
+                    )}
+
+                    {!isUploading && !imageUrl && (
+                      <p className="text-sm text-gray-500">
+                        Supports: JPG, PNG, GIF, etc.
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 {uploadError && (
-                  <Alert variant="destructive">
+                  <Alert variant="destructive" className="mt-2">
                     <XCircle className="h-4 w-4" />
-                    <AlertTitle>Lỗi tải lên</AlertTitle>
+                    <AlertTitle>Upload Error</AlertTitle>
                     <AlertDescription>{uploadError}</AlertDescription>
                   </Alert>
                 )}
 
                 {(imageFile || imageUrl) && (
                   <div className="mt-4">
+                    <Label className="mb-2 block">Image Preview</Label>
                     <ImagePreview imageUrl={imageUrl} imageFile={imageFile} />
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
 
-        <TabsContent value="configure">
-          <Card>
-            <CardHeader>
-              <CardTitle>Cấu hình video</CardTitle>
-              <CardDescription>
-                Cài đặt các tham số để tạo video
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            {/* Configuration Section */}
+            <div>
+              <h3 className="text-lg font-medium mb-2">2. Configure Video</h3>
               <form onSubmit={handleSubmit}>
-                <div className="grid gap-6">
+                <div className="grid gap-4">
                   <div>
                     <Label htmlFor="prompt" className="mb-2 block">
-                      Mô tả (Prompt)
+                      Prompt
                     </Label>
                     <Textarea
                       id="prompt"
-                      placeholder="Mô tả chi tiết cho video của bạn"
+                      placeholder="Detailed description for your video"
                       value={formData.prompt}
                       onChange={(e) =>
                         handleInputChange("prompt", e.target.value)
@@ -335,11 +354,11 @@ const ImageToVideoApp = () => {
 
                   <div>
                     <Label htmlFor="negative_prompt" className="mb-2 block">
-                      Mô tả tiêu cực (Negative Prompt)
+                      Negative Prompt
                     </Label>
                     <Textarea
                       id="negative_prompt"
-                      placeholder="Những điều bạn không muốn xuất hiện trong video"
+                      placeholder="Things you don't want to appear in the video"
                       value={formData.negative_prompt}
                       onChange={(e) =>
                         handleInputChange("negative_prompt", e.target.value)
@@ -350,7 +369,7 @@ const ImageToVideoApp = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="duration" className="mb-2 block">
-                        Thời lượng
+                        Duration
                       </Label>
                       <Select
                         value={formData.duration}
@@ -359,18 +378,18 @@ const ImageToVideoApp = () => {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Chọn thời lượng" />
+                          <SelectValue placeholder="Select duration" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="5">5 giây</SelectItem>
-                          <SelectItem value="10">10 giây</SelectItem>
+                          <SelectItem value="5">5 seconds</SelectItem>
+                          <SelectItem value="10">10 seconds</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div>
                       <Label htmlFor="aspect_ratio" className="mb-2 block">
-                        Tỷ lệ khung hình
+                        Aspect Ratio
                       </Label>
                       <Select
                         value={formData.aspect_ratio}
@@ -379,7 +398,7 @@ const ImageToVideoApp = () => {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Chọn tỷ lệ khung hình" />
+                          <SelectValue placeholder="Select aspect ratio" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="16:9">16:9 (Landscape)</SelectItem>
@@ -402,8 +421,8 @@ const ImageToVideoApp = () => {
                           </TooltipTrigger>
                           <TooltipContent>
                             <p className="max-w-xs">
-                              Mức độ model tuân theo prompt của bạn. Giá trị cao
-                              hơn khiến model tuân thủ chặt chẽ hơn.
+                              How closely the model follows your prompt. Higher
+                              values make the model adhere more strictly.
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -421,81 +440,77 @@ const ImageToVideoApp = () => {
                     />
                   </div>
 
-                  <div className="mt-4">
-                    <Label>Xem trước ảnh</Label>
-                    <ImagePreview imageUrl={imageUrl} imageFile={imageFile} />
+                  {generateError && (
+                    <Alert variant="destructive">
+                      <XCircle className="h-4 w-4" />
+                      <AlertTitle>Generation Error</AlertTitle>
+                      <AlertDescription>{generateError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="mt-2 flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleReset}
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={!formData.prompt || !imageUrl || isGenerating}
+                    >
+                      {isGenerating ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4 mr-2" />
+                      )}
+                      Generate Video
+                    </Button>
                   </div>
                 </div>
-
-                {generateError && (
-                  <Alert variant="destructive" className="mt-4">
-                    <XCircle className="h-4 w-4" />
-                    <AlertTitle>Lỗi tạo video</AlertTitle>
-                    <AlertDescription>{generateError}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="mt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={handleReset}>
-                    Làm mới
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={!formData.prompt || !imageUrl || isGenerating}
-                  >
-                    {isGenerating ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4 mr-2" />
-                    )}
-                    Tạo video
-                  </Button>
-                </div>
               </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
 
-        <TabsContent value="status">
-          <Card>
-            <CardHeader>
-              <CardTitle>Trạng thái xử lý</CardTitle>
-              <CardDescription>Theo dõi quá trình tạo video</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {statusData?.status === "failed" && (
-                  <Alert variant="destructive">
-                    <XCircle className="h-4 w-4" />
-                    <AlertTitle>Lỗi xử lý</AlertTitle>
-                    <AlertDescription>
-                      {statusData?.error ||
-                        "Đã xảy ra lỗi trong quá trình tạo video. Vui lòng thử lại."}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <ProcessStatus status={statusData?.status || "pending"} />
-
-                {statusData?.status === "completed" &&
-                  statusData?.video_url && (
-                    <div className="mt-6">
-                      <Label className="mb-2 block">Video đã tạo</Label>
-                      <VideoPreview videoUrl={statusData.video_url} />
-                    </div>
+            {/* Status Section */}
+            {requestId && (
+              <div>
+                <h3 className="text-lg font-medium mb-2">
+                  3. Processing Status
+                </h3>
+                <div className="space-y-4">
+                  {statusData?.status === "failed" && (
+                    <Alert variant="destructive">
+                      <XCircle className="h-4 w-4" />
+                      <AlertTitle>Processing Error</AlertTitle>
+                      <AlertDescription>
+                        {statusData?.error ||
+                          "An error occurred during video creation. Please try again."}
+                      </AlertDescription>
+                    </Alert>
                   )}
+
+                  <ProcessStatus status={statusData?.status || "pending"} />
+
+                  {statusData?.status === "completed" &&
+                    statusData?.video_url && (
+                      <div className="mt-4">
+                        <Label className="mb-2 block">Generated Video</Label>
+                        <VideoPreview videoUrl={statusData.video_url} />
+                      </div>
+                    )}
+
+                  <div className="mt-4">
+                    <Button variant="outline" onClick={handleReset}>
+                      Create New Video
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-            <CardFooter>
-              <div className="flex justify-between w-full">
-                <Button variant="outline" onClick={handleReset}>
-                  Tạo video mới
-                </Button>
-              </div>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
