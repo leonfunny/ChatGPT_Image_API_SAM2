@@ -42,3 +42,18 @@ class VideoGenerationRequest(GeneralModel):
 class GenerationLeonardoResponse(GeneralModel):
     generation_id: str
     status: str
+
+
+class ImageToVideoRequest(GeneralModel):
+    image_url: str
+    prompt: str
+    frame_interpolation: Optional[bool]
+    is_public: Optional[bool]
+    prompt_enhance: Optional[bool]
+
+
+class ImageToVideoResponse(GeneralModel):
+    generation_id: str
+    status: str
+    message: Optional[str]
+    image_id: Optional[str]

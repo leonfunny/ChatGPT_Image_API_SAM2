@@ -22,4 +22,15 @@ const download = async (imageUrl) => {
   });
   return response?.data;
 };
-export { uploadImageService, download };
+const uploadImageToLeonardo = async (data) => {
+  const response = await Request({
+    method: HTTP_METHOD.POST,
+    url: HOST.uploadToLeonardo,
+    data: data,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response?.data;
+};
+export { uploadImageService, uploadImageToLeonardo, download };

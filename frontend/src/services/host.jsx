@@ -11,6 +11,7 @@ export const HOST = {
   history: "generate/history",
   deleteHistory: "generate/history",
   upload: "upload",
+  uploadToLeonardo: "generate/upload-to-leonardo",
   uploadVideo: "upload-video",
   generateVideo: "generate/video",
   generateTextToVideo: "generate/text-to-video",

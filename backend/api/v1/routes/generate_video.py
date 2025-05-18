@@ -1,13 +1,11 @@
 import uuid
-import random
-import asyncio
 from api.v1.schemas.video import (
     GenerateVideoRequest,
     GenerationLeonardoResponse,
     VideoGenerationRequest,
     VideoResponse,
 )
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Depends, UploadFile
 import fal_client
 import httpx
 from core.config import settings
@@ -17,12 +15,12 @@ router = APIRouter()
 
 request_states = {}
 
-SAMPLE_VIDEO_URLS = [
-    "https://v3.fal.media/files/lion/DDHlO3zS6d9QvQTZqC6L0_output.mp4",
-    "https://v3.fal.media/files/kangaroo/IkMxgPpvf3jZ5UKfrlnEY_output.mp4",
-    "https://v3.fal.media/files/zebra/vvzj5u7wv9wk06GA4zTJX_output.mp4",
-    "https://v3.fal.media/files/rabbit/s2UBvHIiFlX0mw7i4TIWp_output.mp4",
-]
+# SAMPLE_VIDEO_URLS = [
+#     "https://v3.fal.media/files/lion/DDHlO3zS6d9QvQTZqC6L0_output.mp4",
+#     "https://v3.fal.media/files/kangaroo/IkMxgPpvf3jZ5UKfrlnEY_output.mp4",
+#     "https://v3.fal.media/files/zebra/vvzj5u7wv9wk06GA4zTJX_output.mp4",
+#     "https://v3.fal.media/files/rabbit/s2UBvHIiFlX0mw7i4TIWp_output.mp4",
+# ]
 
 
 @router.post("/video", response_model=VideoResponse, status_code=202)
@@ -32,35 +30,35 @@ async def generate_video(
     request_id = str(uuid.uuid4())
     request_states[request_id] = {"status": "pending"}
 
-    background_tasks.add_task(fake_process_video_request, request, request_id)
+    background_tasks.add_task(process_video_request, request, request_id)
 
     return VideoResponse(request_id=request_id, status="pending")
 
 
-async def fake_process_video_request(request, request_id: str):
-    request_states[request_id]["status"] = "processing"
+# async def fake_process_video_request(request, request_id: str):
+#     request_states[request_id]["status"] = "processing"
 
-    processing_time = random.uniform(3, 20)
-    await asyncio.sleep(processing_time)
+#     processing_time = random.uniform(3, 20)
+#     await asyncio.sleep(processing_time)
 
-    if random.random() < 0.95:
-        video_url = random.choice(SAMPLE_VIDEO_URLS)
-        request_states[request_id] = {
-            "status": "completed",
-            "video_url": video_url,
-            "params": request_states[request_id].get("params", {}),
-        }
-    else:
-        error_messages = [
-            "Network error during processing",
-            "Invalid image format",
-            "Server overloaded",
-            "Processing timeout",
-        ]
-        request_states[request_id] = {
-            "status": "failed",
-            "error": random.choice(error_messages),
-        }
+#     if random.random() < 0.95:
+#         video_url = random.choice(SAMPLE_VIDEO_URLS)
+#         request_states[request_id] = {
+#             "status": "completed",
+#             "video_url": video_url,
+#             "params": request_states[request_id].get("params", {}),
+#         }
+#     else:
+#         error_messages = [
+#             "Network error during processing",
+#             "Invalid image format",
+#             "Server overloaded",
+#             "Processing timeout",
+#         ]
+#         request_states[request_id] = {
+#             "status": "failed",
+#             "error": random.choice(error_messages),
+#         }
 
 
 async def process_video_request(request: GenerateVideoRequest, request_id: str):
@@ -109,28 +107,38 @@ async def check_status(request_id: str):
 
 
 async def call_leonardo_api(
-    client: httpx.AsyncClient, endpoint: str, method: str = "GET", payload: dict = None
+    client: httpx.AsyncClient,
+    endpoint: str,
+    method: str = "GET",
+    payload: dict = None,
+    files: dict = None,
 ):
     url = f"{settings.LEONARDO_API_URL}/{endpoint}"
     headers = {
         "accept": "application/json",
         "authorization": f"Bearer {settings.LEONARDO_API_KEY}",
-        "content-type": "application/json",
     }
 
     try:
         if method == "GET":
             response = await client.get(url, headers=headers)
         elif method == "POST":
-            response = await client.post(url, headers=headers, json=payload)
+            if files:
+                form_data = {}
+                if payload:
+                    for key, value in payload.items():
+                        form_data[key] = value
+
+                response = await client.post(
+                    url, headers=headers, files=files, data=form_data
+                )
+            else:
+                headers["content-type"] = "application/json"
+                response = await client.post(url, headers=headers, json=payload)
         else:
             raise ValueError(f"Unsupported method: {method}")
 
-        if response.status_code >= 400:
-            error_msg = f"Leonardo API error: {response.status_code}, {response.text}"
-            return {"error": error_msg, "status_code": response.status_code}
-
-        return response.json()
+        return response
     except Exception as e:
         error_msg = f"Error calling Leonardo API: {str(e)}"
         return {"error": error_msg, "status_code": 500}
@@ -195,7 +203,6 @@ async def get_generation_status(
 
     generation_status = response.get("generations_by_pk", {}).get("status", "UNKNOWN")
 
-    # Prepare the response
     result = {
         "id": generation_id,
         "status": generation_status,
@@ -208,8 +215,67 @@ async def get_generation_status(
         if generated_items:
             result["video_url"] = generated_items[0].get("motionMP4URL")
 
-    # If generation failed, add error message
     elif generation_status == "FAILED":
         result["error"] = "Generation failed"
 
     return result
+
+
+@router.post("/upload-to-leonardo", response_model=dict)
+async def upload_to_leonardo(
+    image: UploadFile = File(...),
+    client: httpx.AsyncClient = Depends(get_http_client),
+):
+    image_bytes = await image.read()
+    filename = image.filename
+    extension = filename.split(".")[-1] if "." in filename else ""
+    payload = {"extension": extension}
+
+    files = {"file": (image.filename, image_bytes, image.content_type)}
+
+    response = await call_leonardo_api(
+        client,
+        "init-image",
+        "POST",
+        payload=payload,
+        files=files,
+    )
+
+    if isinstance(response, dict) and "error" in response:
+        raise HTTPException(
+            status_code=response.get("status_code", 500), detail=response["error"]
+        )
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    return response.json()
+
+
+# @router.post("/image-to-video", response_model=ImageToVideoResponse)
+# async def generate_image_to_video(
+#     request: ImageToVideoRequest,
+#     leonardo_service: LeonardoService = Depends(get_leonardo_service),
+# ):
+#     try:
+#         result = await leonardo_service.image_to_video_from_url(
+#             image_url=str(request.image_url),
+#             prompt=request.prompt,
+#             frame_interpolation=request.frame_interpolation,
+#             is_public=request.is_public,
+#             prompt_enhance=request.prompt_enhance,
+#         )
+
+#         return ImageToVideoResponse(
+#             generation_id=result["generation_id"],
+#             status=result["status"],
+#             message=result.get("message"),
+#             image_id=result.get("image_id"),
+#         )
+
+#     except Exception as e:
+#         if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
+#             raise HTTPException(
+#                 status_code=429, detail="Rate limit exceeded. Please try again later."
+#             )
+#         raise HTTPException(status_code=500, detail=str(e))

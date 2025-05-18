@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import ImageToVideoApp from "./image-to-video";
 import LeonardoTextToVideo from "./text-to-video";
+import LeonardoImageToVideo from "./leonardo-image-to-video.jsx"; // Giả sử bạn có component này
 import {
   Select,
   SelectContent,
@@ -31,6 +32,9 @@ const AppSelector = () => {
               <SelectLabel>App</SelectLabel>
               <SelectItem value="image-to-video">Image to Video App</SelectItem>
               <SelectItem value="text-to-video">Text to Video App</SelectItem>
+              <SelectItem value="leonardo-image-to-video">
+                Image to Video - Model Leonardo
+              </SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -39,8 +43,10 @@ const AppSelector = () => {
       <div className="mt-4">
         {selectedApp === "image-to-video" ? (
           <ImageToVideoApp />
-        ) : (
+        ) : selectedApp === "text-to-video" ? (
           <LeonardoTextToVideo />
+        ) : (
+          <LeonardoImageToVideo />
         )}
       </div>
     </div>

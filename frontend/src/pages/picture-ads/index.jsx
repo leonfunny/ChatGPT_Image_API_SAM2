@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import React, { useState, useCallback, useEffect } from "react";
 import { Upload, X } from "lucide-react";
 import { useDropzone } from "react-dropzone";
@@ -41,10 +42,6 @@ const PictureAdsTab = () => {
   const [generatedBanners, setGeneratedBanners] = useState([]);
   const [quality, setQuality] = useState("medium");
   const [imageSize, setImageSize] = useState("1024x1536");
-
-  const goToNextStep = () => {
-    setCurrentStep((prev) => Math.min(prev + 1, 2)); // Giới hạn chỉ có 2 step
-  };
 
   const goToPreviousStep = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
@@ -180,6 +177,7 @@ const PictureAdsTab = () => {
                 .trim();
             }
           } catch (e) {
+            console.log(e);
             extractedDescription = responseData.content
               .replace(/```json|```/g, "")
               .trim();
@@ -288,7 +286,6 @@ const PictureAdsTab = () => {
 
   return (
     <div className="w-full space-y-6 p-4 max-w-6xl mx-auto">
-      {/* Workflow Progress Indicator - Chỉ hiển thị 2 steps */}
       <div className="w-full mb-8">
         <div className="flex items-center justify-between">
           <div
@@ -405,7 +402,6 @@ const PictureAdsTab = () => {
         />
       )}
 
-      {/* Step 2: Creative Ideas Selection và Generate luôn */}
       {currentStep === 2 && (
         <Card className="border-2 border-primary/70">
           <CardHeader>
@@ -501,7 +497,6 @@ const PictureAdsTab = () => {
                 </div>
               </div>
 
-              {/* Generate Button ngay trong step 2 */}
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   onClick={processImageWithAllIdeas}
@@ -520,7 +515,6 @@ const PictureAdsTab = () => {
               </div>
             )}
 
-            {/* Hiển thị kết quả ngay trong step 2 */}
             {generatedBanners.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-lg font-medium mb-3">Generated Banners</h3>
