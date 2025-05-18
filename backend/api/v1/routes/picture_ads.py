@@ -58,6 +58,7 @@ class VariationResponse(GeneralModel):
 async def generate_prompt_with_files(
     prompt: str = Form(...),
     images: List[UploadFile] = File([]),
+    model: Optional[str] = Form("gpt-4.1"),
 ):
     try:
         content = [{"type": "text", "text": prompt}]
@@ -76,7 +77,7 @@ async def generate_prompt_with_files(
             )
 
         completion = await client.chat.completions.create(
-            model="gpt-4.1", messages=[{"role": "user", "content": content}]
+            model=model, messages=[{"role": "user", "content": content}]
         )
 
         response_dict = {

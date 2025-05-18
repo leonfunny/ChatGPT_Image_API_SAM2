@@ -7,6 +7,7 @@ import {
   SquareDashedMousePointer,
   FileVideo,
   ImagePlus,
+  ImagePlay,
 } from "lucide-react";
 
 import { NavMain } from "@/components/side-bar/nav-main";
@@ -52,6 +53,11 @@ const data = {
       title: "Picture Ads",
       url: "picture-ads",
       icon: ImagePlus,
+    },
+    {
+      title: "Video Ads",
+      url: "video-ads",
+      icon: ImagePlay,
     },
   ],
   navSecondary: [

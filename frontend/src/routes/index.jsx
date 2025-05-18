@@ -11,6 +11,7 @@ const SegmentImagePage = lazy(() => import("@/pages/segment-image"));
 const GenerateImagePage = lazy(() => import("@/pages/generate-image"));
 const ImageToVideoPage = lazy(() => import("@/pages/image-to-video"));
 const PictureAdsPage = lazy(() => import("@/pages/picture-ads"));
+const VideoAdsPage = lazy(() => import("@/pages/video-ads"));
 
 const MainRouter = () => {
   return (
@@ -39,6 +40,7 @@ const MainRouter = () => {
               path={RouteName.IMAGE_TO_VIDEO}
             />
             <Route element={<PictureAdsPage />} path={RouteName.PICTURE_ADS} />
+            <Route element={<VideoAdsPage />} path={RouteName.VIDEO_ADS} />
           </Route>
         </Route>
 

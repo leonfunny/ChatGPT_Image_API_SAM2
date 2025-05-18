@@ -6,4 +6,5 @@ export const RouteName = {
   SEGMENT_IMAGE: "segment-image",
   IMAGE_TO_VIDEO: "image-to-video",
   PICTURE_ADS: "picture-ads",
+  VIDEO_ADS: "video-ads",
 };
