@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { promptGenerating } from "@/services/picture-ads";
-import { PROMPT } from "./constant";
+import { PROMPT_GENERATE_DESCRIPTION, PROMPT_SCRIPT } from "./constant";
 import ScriptGenerated from "./script-generated";
+import { Textarea } from "@/components/ui/textarea";
 
 const VideoAds = () => {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [shotGenerated, setShotGenerated] = useState(null);
+  const [scriptGenerated, setScriptGenerated] = useState(null);
+  const [description, setDescription] = useState("");
+  const [descriptionGenerated, setDescriptionGenerated] = useState("");
 
   // Handle file drop
   const onDrop = useCallback((acceptedFiles) => {
@@ -25,7 +28,6 @@ const VideoAds = () => {
     }
   }, []);
 
-  // Configure dropzone
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -34,7 +36,6 @@ const VideoAds = () => {
     maxFiles: 1,
   });
 
-  // Handle file upload
   const handleUpload = async (uploadFile) => {
     if (!uploadFile) return;
 
@@ -42,17 +43,21 @@ const VideoAds = () => {
       setLoading(true);
 
       const formData = new FormData();
-      formData.append("image", uploadFile);
+      formData.append("images", uploadFile);
       formData.append("model", "o3-2025-04-16");
-      formData.append("prompt", PROMPT);
+
+      const promptToUse = description.trim()
+        ? description
+        : PROMPT_GENERATE_DESCRIPTION;
+
+      formData.append("prompt", promptToUse);
 
       const result = await promptGenerating(formData);
-      setShotGenerated(result);
-      toast.success("Generate scrip successfully!");
+      setDescriptionGenerated(result?.content);
+      toast.success("Generate script successfully!");
       return result;
     } catch (error) {
-      toast.error("Something went wrong! Please try again.");
-      console.error("Upload error:", error);
+      error && toast.error("Something went wrong! Please try again.");
     } finally {
       setLoading(false);
     }
@@ -64,7 +69,39 @@ const VideoAds = () => {
     }
     setFile(null);
     setPreview(null);
-    setShotGenerated(null);
+    setScriptGenerated(null);
+  };
+
+  // Handle description change
+  const handleDescriptionChange = (e) => {
+    setDescription(e.target.value);
+  };
+
+  const handleGenerateScript = async () => {
+    if (!file) {
+      toast.error("Please upload an image first");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const prompt = PROMPT_SCRIPT.replace(
+        "{description}",
+        descriptionGenerated
+      );
+      const formData = new FormData();
+      formData.append("images", file);
+      formData.append("model", "o3-2025-04-16");
+      formData.append("prompt", prompt);
+
+      const result = await promptGenerating(formData);
+      setScriptGenerated(result?.content);
+      toast.success("Generate script successfully!");
+    } catch (error) {
+      error && toast.error("Something went wrong! Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,6 +114,26 @@ const VideoAds = () => {
             <p className="text-sm text-gray-500 mt-1">
               Upload an image to create a video ad script. Supported formats:
               JPG, PNG, GIF, WEBP.
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium mb-1"
+            >
+              Description (Optional)
+            </label>
+            <Textarea
+              id="description"
+              placeholder="Enter custom prompt or leave empty for auto product analysis"
+              value={description}
+              onChange={handleDescriptionChange}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Leave empty to automatically analyze product and generate
+              description
             </p>
           </div>
 
@@ -144,17 +201,25 @@ const VideoAds = () => {
           )}
         </Card>
       </div>
+      {descriptionGenerated && (
+        <div className="p-4">
+          <pre className="bg-gray-50 p-4 rounded-md overflow-auto text-sm">
+            {descriptionGenerated}
+          </pre>
+          <Button
+            className="w-full"
+            disabled={loading}
+            onClick={handleGenerateScript}
+          >
+            Generate script
+          </Button>
+        </div>
+      )}
 
-      {/* Full shotGenerated Editor Section - Expanded view below */}
-      {shotGenerated && (
-        <Card className="p-6 mt-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold">Shot Generated Detail</h2>
-          </div>
-          <div className="mt-2">
-            <ScriptGenerated apiResponse={shotGenerated} sourceImage={file} />
-          </div>
-        </Card>
+      {scriptGenerated && (
+        <div className="mt-2">
+          <ScriptGenerated scriptGenerated={scriptGenerated} />
+        </div>
       )}
     </div>
   );

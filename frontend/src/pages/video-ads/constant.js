@@ -1,47 +1,62 @@
-export const PROMPT = `Tạo kịch bản video dưới 20s quảng cáo dành cho phụ nữ bằng ý tưởng từ banner quảng cáo trong ảnh này tối đa 4-5 shot video mỗi shot tối đa khoảng 5s sử dụng các loại motion control này :
-Các tuỳ chọn "Motion Control" : None, Crane Down, Crane Up, Crash Zoom In, Disintegration, Dolly In, Dolly Left, Dolly Out, Dolly Right, Explosion, Medium Zoom In, Orbit Left, Orbit Right, Tilt Down, Tilt Up.
+export const PROMPT_SCRIPT = `phân tích sản phẩm trong ảnh này với {description} tìm các yếu tố phù hợp với sản phẩm rồi tạo kịch bản quảng cáo video có CGI cho tôi như các ý tưởng dưới đây : 
+
+Khi bạn chỉ có ảnh sản phẩm tĩnh (không có người mẫu, không video gốc), 
+bạn vẫn có thể tạo quảng cáo ấn tượng bằng cách kết hợp ảnh với CGI (computer-generated imagery) để tạo ra các video hoặc banner động hấp dẫn. 
+Dưới đây là các phong cách phổ biến tận dụng được CGI, đặc biệt hiệu quả với thời trang, giày dép, mỹ phẩm: 
+1. Sản phẩm bay lơ lửng / xoay 3D Mô tả: Sản phẩm được dựng xoay vòng, nổi giữa không trung, ánh sáng chiếu vào tạo hiệu ứng cao cấp. CGI tận dụng: Thêm ánh sáng động, shadow mềm, hiệu ứng chuyển động (xoay, phóng to, thu nhỏ). Ứng dụng: Studio premium, vũ trụ, môi trường sang trọng. \n
+2. Môi trường siêu thực / Fantasy Mô tả: Đặt sản phẩm trong bối cảnh CGI như không gian vũ trụ, rừng cổ tích, bề mặt băng, hoặc thế giới tương lai. CGI tận dụng: Background, hiệu ứng hạt sáng, ánh sáng động, phản chiếu. Ứng dụng: Thời trang cá tính, giày sneaker, sản phẩm trẻ trung. \n
+3. Chuyển động slow-motion + hiệu ứng nổ / splash Mô tả: Sản phẩm rơi xuống mặt phẳng, tạo ra vụ nổ màu, nước, cát, ánh sáng... CGI tận dụng: Hiệu ứng nổ (explosion, color splash, dust), motion blur, fluid simulation. Ứng dụng: Quảng cáo năng động, thể thao, làm nổi bật chi tiết. \n
+4. Sản phẩm kết hợp typography động Mô tả: Từ khóa quảng cáo (ví dụ: "Wygoda", "Styl", "Nowość") xuất hiện cùng với chuyển động của sản phẩm. CGI tận dụng: Text 3D xuất hiện, tan biến, bay vào từ các hướng. Ứng dụng: Video social, TikTok, Facebook Ads. \n
+5. Biến đổi sản phẩm / Morphing CGI Mô tả: Sản phẩm biến hình từ vật liệu này sang vật liệu khác, hoặc mở ra, lắp ráp, cấu thành... CGI tận dụng: Animation morphing, layer chuyển động, dựng nội thất sản phẩm. Ứng dụng: Giày thể thao, túi xách công nghệ, đồng hồ. \n
+6. Kết hợp ánh sáng động (Neon / Cinematic lighting) Mô tả: Sản phẩm được chiếu sáng bằng dải sáng neon động, ánh sáng thay đổi tone màu liên tục. CGI tận dụng: Light trail, glow, rim light. Ứng dụng: Thời trang hiện đại, quảng cáo đêm, chiến dịch retro/futuristic. \n
+7. Ảo giác thị giác / Optical illusion Mô tả: Sản phẩm như đang di chuyển qua các khối hình học, không gian uốn cong, phản chiếu vô hạn. CGI tận dụng: Không gian 3D trừu tượng, gương, phản xạ. Ứng dụng: Quảng cáo high-fashion, luxury, hoặc cực kỳ sáng tạo. Nếu bạn muốn mình gợi ý cụ thể ý tưởng nào phù hợp với từng sản phẩm bạn có (ví dụ: giày sneaker, túi boho, nước hoa...), bạn có thể gửi ảnh, mình sẽ gợi ý cụ thể ý tưởng + phong cách CGI kèm prompt luôn. You said: Kể thêm các phong cách và ý tưởng khác ChatGPT said: Dưới đây là danh sách các phong cách quảng cáo sản phẩm sử dụng ảnh tĩnh + CGI được mở rộng, kèm theo ý tưởng ứng dụng cụ thể để bạn dễ lựa chọn hoặc lên kịch bản \n
+8. Phong cách “Nature meets Product” – Tự nhiên hòa quyện sản phẩm Ý tưởng: Giày mọc lên giữa rừng, hoa nở từ trong sản phẩm, cát cuộn quanh đế giày... CGI tận dụng: Hoa, cây, lá, nước, bụi bay chậm. Ứng dụng: Sản phẩm thân thiện môi trường, giày mùa hè, nước hoa. \n
+9. Product in Motion – Tạo ảo giác chuyển động Ý tưởng: Dùng CGI để mô phỏng sản phẩm đang di chuyển (xoay, trượt, nhảy, lăn) dù ảnh gốc là tĩnh. CGI tận dụng: Motion blur, đường chuyển động (motion path), trail effect. Ứng dụng: Giày sneaker, đồng hồ, balo. \n
+10. Hiệu ứng biến đổi thời gian – Time-lapse Ý tưởng: Cảnh ngày – đêm thay đổi xung quanh sản phẩm; bối cảnh mùa xuân chuyển sang đông... CGI tận dụng: Thay đổi ánh sáng, bầu trời, hiệu ứng thời tiết (tuyết, nắng...). Ứng dụng: Giày mùa đông/hè, đồ skincare, mỹ phẩm. \n
+11. Sản phẩm trên bệ trưng bày CGI – Luxury Display Ý tưởng: Sản phẩm đặt trên pedestal (bệ), ánh sáng spotlight, kính xoay hoặc nền phản chiếu. CGI tận dụng: Gương, đá cẩm thạch, nền studio cao cấp. Ứng dụng: Giày cao cấp, nước hoa, đồng hồ. \n
+12. Tunnel Effect / Infinite Zoom Ý tưởng: Camera zoom từ xa tới gần, đi xuyên qua nhiều lớp (vũ trụ, khối hình, đường hầm) tới sản phẩm. CGI tận dụng: Ống ánh sáng, tunnel 3D, parallax layers. Ứng dụng: Giày tương lai, chiến dịch "phát hiện sản phẩm hot". \n
+13. Freeze-Frame Explosion Ý tưởng: Camera "đóng băng" khoảnh khắc sản phẩm phá tung nước, thủy tinh, bụi màu. CGI tận dụng: Hiệu ứng vật thể vỡ tung, chuyển động ngừng thời gian (bullet-time). Ứng dụng: Thể thao, năng động, sneaker style. \n
+14. Phong cách "Khoa học viễn tưởng" / Sci-fi Ý tưởng: Sản phẩm như thiết bị ngoài hành tinh, giày với hologram hiện ra, hiệu ứng techy glow. CGI tận dụng: Hologram, lưới điện, màn hình tech, cổng dịch chuyển. Ứng dụng: Thời trang techwear, giới trẻ, khách hàng yêu công nghệ. \n
+15. Phong cách “Thế giới thu nhỏ” / Miniature World Ý tưởng: Sản phẩm như một tòa nhà, con đường nhỏ xíu với xe, người mini đi xung quanh. CGI tận dụng: Dựng mô hình nhỏ, hiệu ứng tilt-shift. Ứng dụng: Quảng cáo sáng tạo, gây tò mò. \n
+16. Giải phẫu sản phẩm / Layer breakdown Ý tưởng: Cấu trúc giày / túi được "bung lớp" như đồ họa kỹ thuật (đế, lớp lót, chất liệu...). CGI tận dụng: 3D layer, animation phân tách. Ứng dụng: Nhấn mạnh chất lượng, độ bền. \n
+17. Phong cách “Product in Spotlight” + Bóng đổ nghệ thuật Ý tưởng: Sản phẩm giữa nền tối, spotlight từ trên hắt xuống, bóng đổ tạo hình logo, thông điệp. CGI tận dụng: Shadow mapping, ánh sáng động. Ứng dụng: Banner đơn giản, high-impact. Bạn có thể kết hợp nhiều phong cách lại trong cùng 1 video: Ví dụ giày xoay lơ lửng → ánh sáng spotlight → hiệu ứng bụi màu nổ ra → zoom vào slogan. Muốn mình viết prompt cụ thể cho phong cách nào không? Gửi mình ảnh sản phẩm (ảnh cắt nền hoặc ảnh gốc) + bạn muốn video phong cách nào trong danh sách trên, mình sẽ tạo prompt cho Midjourney, Kling hoặc D-ID tùy bạn dùng. You said: Viết thêm các ý tưởng ChatGPT said: Dưới đây là các ý tưởng bổ sung độc đáo hơn dành cho quảng cáo chỉ dùng ảnh sản phẩm tĩnh, tận dụng CGI và hiệu ứng để tạo cảm xúc, phong cách hoặc câu chuyện ấn tượng \n
+18. Câu chuyện hình tượng hóa – "Giày là nhân vật chính" Ý tưởng: Biến sản phẩm thành "nhân vật" trong câu chuyện – ví dụ, giày bước qua các địa hình: cát, rừng, thành phố, mỗi cảnh tượng như một chương truyện. CGI tận dụng: Mô phỏng địa hình, camera tracking theo giày, hiệu ứng môi trường thay đổi. Ứng dụng: Quảng bá tính đa năng, phù hợp mọi nơi. \n
+19. Sản phẩm trong khối tinh thể / đá quý Ý tưởng: Giày/túi nằm trong khối băng, pha lê, thủy tinh... sau đó tan ra hoặc vỡ ra để lộ sản phẩm. CGI tận dụng: Hiệu ứng vỡ, phản xạ ánh sáng, animation dissolve. Ứng dụng: Sản phẩm cao cấp, tạo cảm giác “được khám phá”. \n
+20. Sản phẩm tương tác với yếu tố vật lý Ý tưởng: Gió thổi qua làm dây giày tung lên, nước nhỏ vào tạo ripple, sàn nhà rung lắc nhẹ dưới đế giày. CGI tận dụng: Cloth simulation, ripple, camera shake. Ứng dụng: Tạo cảm giác sống động như thật. \n
+21. Hiệu ứng "khởi động sức mạnh" Ý tưởng: Đôi giày như đang sạc điện, phát sáng, rồi bung ra hiệu ứng tốc độ, năng lượng. CGI tận dụng: Điện năng, xung ánh sáng, particle glow. Ứng dụng: Sneaker, giày thể thao, chiến dịch năng động. \n
+22. Sản phẩm trong khung trưng bày ảo (virtual museum/gallery) Ý tưởng: Camera đi ngang qua bảo tàng hiện đại, nơi từng đôi giày/túi được chiếu sáng trong hộp kính. CGI tận dụng: Khung 3D, ánh sáng điểm, camera pan mượt. Ứng dụng: Chiến dịch tôn vinh sản phẩm chủ lực. \n
+23. “Chạm để biến hình” Ý tưởng: Sản phẩm hiện ra, khi “chạm” vào (camera zoom, sparkle...), đổi màu, thay chất liệu, hoặc chuyển sang phiên bản mới. CGI tận dụng: Morphing animation, layer transition. Ứng dụng: Quảng cáo nhiều màu, phiên bản mới. \n
+24. Kết hợp logo + hiệu ứng thương hiệu Ý tưởng: Sản phẩm xoay, hiệu ứng ánh sáng quét qua và logo hiện dần trên nền. Logo phát sáng hoặc tan ra như bụi vàng. CGI tận dụng: Particle system, light reveal, glow animation. Ứng dụng: Phần kết video, nâng nhận diện thương hiệu. \n
+25. Tương phản giữa "Cũ & Mới" / "Thường & Sang" Ý tưởng: Bối cảnh chia đôi: một bên là cảnh thường (nền đơn giản), bên kia là CGI cao cấp – khi camera trượt ngang, sản phẩm chuyển từ "cũ" sang "mới". CGI tận dụng: Dual-environment setup, light shift, style switch. Ứng dụng: Quảng bá cải tiến sản phẩm, rebranding. \n
+26. Sản phẩm nổi bật giữa đám đông mờ ảo Ý tưởng: Giày nằm giữa nhiều bản sao mờ, tất cả xoay quanh nhưng chỉ một đôi phát sáng hoặc được zoom vào. CGI tận dụng: Clone object + depth blur, ánh sáng selective. Ứng dụng: "Be the one", "Lựa chọn nổi bật", chủ đề cá tính. Bạn muốn mình chọn ra 1–2 ý tưởng phù hợp với ảnh sản phẩm cụ thể không? Nếu bạn gửi ảnh đôi giày hoặc túi bạn đang chạy ads, mình có thể chọn ý tưởng phù hợp nhất và viết sẵn prompt CGI cho ảnh + video luôn. You said: Vẫn ko tìm thấy ý tưởng phù hợp bạn viết thêm cho tôi ChatGPT said: Rất tốt — mình sẽ đào sâu hơn và viết thêm các ý tưởng độc đáo, mang tính kể chuyện, cảm xúc hoặc gây tò mò, phù hợp khi bạn chỉ có ảnh sản phẩm tĩnh, đặc biệt là giày dép, túi xách, nước hoa, mỹ phẩm… \n
+27. Phong cách "Di sản – Hành trình phát triển" Ý tưởng: Sản phẩm như bước ra từ quá khứ đến hiện đại. Ví dụ: Đôi giày bắt đầu từ hình vẽ phác thảo, sau đó “hóa hình” thành phiên bản thật trong môi trường hiện đại. CGI tận dụng: Phác họa chuyển thành thật, animation bút vẽ, giấy biến thành studio. Ứng dụng: Quảng bá sản phẩm mới nhưng mang tinh thần thủ công/tinh tế. \n
+28. Kịch bản “Bước đầu tiên” – First Step Moment Ý tưởng: Một đôi giày nằm yên, camera zoom vào rồi tạo hiệu ứng như “chạm đất lần đầu” – mặt đất nứt ra nhẹ, ánh sáng tỏa ra từ dưới đế. CGI tận dụng: Ground crack, glow từ đế, slow motion impact. Ứng dụng: Khởi đầu mới, ra mắt bộ sưu tập, giới thiệu mẫu đầu tiên. \n
+29. Hiệu ứng “Chi tiết tỏa sáng” Ý tưởng: Camera bay qua các chi tiết: đường khâu, lớp da, logo, đế giày… Mỗi chi tiết sáng nhẹ lên, kết thúc bằng toàn cảnh. CGI tận dụng: 3D camera flythrough, light spark, depth blur. Ứng dụng: Nhấn mạnh chất lượng, thiết kế cao cấp. \n
+30. Chiến dịch “Sản phẩm là biểu tượng” – Iconic Symbol Ý tưởng: Sản phẩm đứng giữa khung cảnh trống – nhưng từ sản phẩm, các yếu tố CGI bùng nổ ra xung quanh như "phong cách, cá tính, tự do..." CGI tận dụng: Typography motion, glow line, hiệu ứng phóng ra. Ứng dụng: Quảng cáo phong cách sống, branding mạnh. \n
+31. Thế giới xoay quanh sản phẩm – “Center of Universe” Ý tưởng: Sản phẩm đứng yên, trong khi thế giới (bối cảnh, ánh sáng, thời tiết) quay quanh nó. Giống như sản phẩm là trung tâm. CGI tận dụng: Orbit camera, chuyển đổi nhanh giữa nhiều khung cảnh. Ứng dụng: Tuyên bố: "Nó là tất cả bạn cần", hoặc định vị ngôi vương. \n
+32. Biến hóa theo cảm xúc / moodboard sống Ý tưởng: Sản phẩm giữ nguyên, nhưng background thay đổi theo mood (luxury, sporty, casual, elegant...) → mỗi mood kéo dài 2s → tạo cảm giác linh hoạt, đa năng. CGI tận dụng: Background switch, color grading, animation light mood. Ứng dụng: Một đôi giày – nhiều phong cách – một lựa chọn. \n
+33. Phong cách "Hơi thở" – Sống động hóa sản phẩm Ý tưởng: Sản phẩm “thở” – đế giày hơi phồng lên như hít thở, ánh sáng nhịp theo hơi thở. Hiệu ứng tinh tế nhưng gây cuốn hút. CGI tận dụng: Pulse animation, subtle glow rhythm. Ứng dụng: Làm video TikTok hoặc background website rất bắt mắt. \n
+34. Cảm hứng từ thiên nhiên cực đoan Ý tưởng: Giày đứng giữa sấm sét, tuyết, núi lửa, sóng biển… mỗi khung cảnh 1 giây, tạo cảm giác “chinh phục mọi thử thách”. CGI tận dụng: Weather FX, terrain change, epic sound design. Ứng dụng: Dòng giày thể thao, hiking, bền bỉ, giày nam. \n
+35. Chiến dịch “Người xem là nhân vật chính” Ý tưởng: Camera mô phỏng góc nhìn người dùng bước lại gần sản phẩm. Khi chạm vào – mọi thứ xung quanh thay đổi theo phong cách cá nhân. CGI tận dụng: POV effect, môi trường biến hình, animation trigger. Ứng dụng: Quảng bá sản phẩm cá nhân hóa, tự tin, kết nối cảm xúc 
+
 \n Trả về dưới dạng json với cấu trúc dưới đây không viết gì thêm \n
 [
 {
 "shot": "1",
-"scene_description": "................",
-"camera_movement": "................",
-"visual_effects": "................",
-"on_screen_text_if_need": "................",
-"mood": "................",
-"duration": "................"
+"duration": "................",
+"description": "................",
+"CGI_elements": ["................", "................", "................", ...],
+
 },
 {
 "shot": "2",
-"scene_description": "................",
-"camera_movement": "................",
-"visual_effects": "................",
-"on_screen_text_if_need": "................",
-"mood": "................",
-"duration": "................"
+"duration": "................",
+"description": "................",
+"CGI_elements": ["................", "................", "................", ...],
 }, ....]`;
 
-export const PROMPT_GENERATE_IMAGE_AND_VIDEO = `Dựa vào kịch bản {responsive_shot_1)
-cho shot quay này hãy viết cho tôi prompt tiếng anh để tạo ảnh cảnh đầu tiên của shot trên sao cho phù hợp với kịch bản nhất có thể. prompt với cấu trúc dành cho chat gpt image .Sau đó viết tiếp prompt video dành cho Kling AI theo công thức :
-Xây dựng Câu lệnh (Prompt) Chi tiết theo Cấu trúc 5 Phần Điện ảnh
-Đây là bước quan trọng nhất. Hãy thật chi tiết!
-Mô tả Chủ thể:
-Ví dụ Text-to-Video (Phi hành gia): "Một nữ phi hành gia dũng cảm trong bộ đồ vũ trụ màu trắng bạc, với những chi tiết phản quang tinh xảo."
-Ví dụ Image-to-Video (Đã có ảnh con mèo): (Phần này đã có sẵn trong ảnh, tập trung vào hành động)
-Hành động:
-Ví dụ Text-to-Video (Phi hành gia): "... đang cắm một lá cờ kim loại có biểu tượng Trái Đất lên bề mặt bụi bặm của một hành tinh xa lạ."
-Ví dụ Image-to-Video (Mèo): "Con mèo Ba Tư lông xù đang chậm rãi vươn vai, ngáp một cái thật to, đôi mắt xanh biếc lim dim."
-Môi trường:
-Ví dụ Text-to-Video (Phi hành gia): "... với bầu trời màu tím huyền ảo, hai mặt trăng lớn lơ lửng và những dãy núi đá nhọn hoắt ở phía xa."
-Ví dụ Image-to-Video (Mèo): (Đã có sẵn trong ảnh, có thể bổ sung chi tiết nếu muốn AI thay đổi nhẹ) "Trên một chiếc ghế sofa nhung màu xanh đậm, bên cạnh một cửa sổ lớn nhìn ra khu vườn đầy nắng."
-Ánh sáng & Bầu không khí/Không khí:
-Ví dụ Text-to-Video (Phi hành gia): "Ánh sáng kỳ lạ từ một tinh vân gần đó chiếu xuống, tạo ra những bóng đổ dài và một cảm giác bí ẩn, điện ảnh, độ phân giải 8K."
-Ví dụ Image-to-Video (Mèo): "Ánh nắng chiều ấm áp chiếu xiên qua cửa sổ, tạo những vệt sáng trên bộ lông mềm mại của con mèo, không khí yên bình, ấm cúng."
-Chuyển động Camera:
-Ví dụ Text-to-Video (Phi hành gia): "Camera từ từ xoay quanh phi hành gia, bắt đầu từ góc thấp và di chuyển lên cao để làm nổi bật hành động cắm cờ và khung cảnh hùng vĩ."
-Ví dụ Image-to-Video (Mèo): "Camera giữ nguyên vị trí, tập trung vào biểu cảm của con mèo, có thể zoom nhẹ vào khuôn mặt khi nó ngáp."
-\n Trả về dưới dạng json dưới đây không viết gì thêm. Ví dụ: \n
-{"id": 1,
-"image_start_prompt": "..............................",
-"ai_video_prompt": ".............................",
-}`
+export const PROMPT_GENERATE_DESCRIPTION = `Phân tích sản phẩm  trong ảnh và viết cho tôi description của sản phẩm trên trả về dưới dạng json không viết gì thêm`;
+
+export const PROMPT_GENERATE_IMAGE = `dựa vào kịch bản sau {shot} viết cho tôi prompt tạo ảnh chat gpt image cho từng shot trả về dạng json không viết gì thêm.
+Ví dụ: {"image_prompt":"......"}
+`;

@@ -9,62 +9,18 @@ import {
   Trash2,
   Film,
   Image as ImageIcon,
-  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PROMPT_GENERATE_IMAGE_AND_VIDEO } from "./constant";
-import {
-  promptGenerating as apiPromptGenerating,
-  editImage as apiEditImage,
-} from "@/services/picture-ads";
+import { promptGenerating as apiPromptGenerating } from "@/services/picture-ads";
+import { generate } from "@/services/generate-image";
 import { toast } from "sonner";
-import { formatStoryboardData } from "./function";
+import { PROMPT_GENERATE_IMAGE } from "./constant";
+import ImageGenerated from "./image-generated";
 
-const generateShotPrompt = async (shot) => {
-  const formData = new FormData();
-  formData.append("model", "gpt-4.1");
-
-  const shotDetails = `Scene: ${shot.scene_description}
-Camera Movement: ${shot.camera_movement}
-Visual Effects: ${shot.visual_effects}
-On Screen Text: ${shot.on_screen_text_if_need}
-Mood: ${shot.mood}
-Duration: ${shot.duration}`;
-
-  const customizedPrompt = PROMPT_GENERATE_IMAGE_AND_VIDEO.replace(
-    "{responsive_shot_1)",
-    shotDetails
-  );
-
-  formData.append("prompt", customizedPrompt);
-
-  const response = await apiPromptGenerating(formData);
-  let promptData = {};
-  if (response && response.content) {
-    const cleanedContent = response.content
-      .replace(/\\r\\n/g, "\\n")
-      .replace(/\r\n/g, "\n")
-      .replace(/[\t\n\r]/g, " ")
-      .replace(/\\"/g, '"')
-      .replace(/"([^"]*)":/g, function (match, p1) {
-        return '"' + p1 + '":';
-      });
-
-    promptData = JSON.parse(cleanedContent);
-  }
-
-  return {
-    image_start_prompt: promptData.image_start_prompt || "",
-    ai_video_prompt: promptData.ai_video_prompt || "",
-  };
-};
-
-const ScriptGenerated = ({ apiResponse, sourceImage }) => {
-  const [shots, setShots] = useState(formatStoryboardData(apiResponse));
-  const [jsonString, setJsonString] = useState(
-    JSON.stringify(formatStoryboardData(apiResponse), null, 2)
-  );
+const ScriptGenerated = ({ scriptGenerated }) => {
+  const [shots, setShots] = useState([]);
+  const [jsonString, setJsonString] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [editingShot, setEditingShot] = useState(null);
@@ -79,20 +35,43 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
   });
 
   useEffect(() => {
-    const formattedData = formatStoryboardData(apiResponse);
-    setShots(formattedData);
-    setJsonString(JSON.stringify(formattedData, null, 2));
+    let parsedScript = scriptGenerated;
+    if (typeof scriptGenerated === "string") {
+      try {
+        parsedScript = JSON.parse(scriptGenerated);
+      } catch (error) {
+        parsedScript = [];
+      }
+    }
+
+    if (!parsedScript) {
+      parsedScript = [];
+    }
+
+    if (!Array.isArray(parsedScript)) {
+      parsedScript = [];
+    }
+
+    const formattedShots = parsedScript.map((shot) => ({
+      ...shot,
+      uploadedImages: shot.uploadedImages || [],
+      selectedImageIndex: shot.selectedImageIndex || 0,
+    }));
+
+    setShots(formattedShots);
+    setJsonString(JSON.stringify(formattedShots, null, 2));
+
     setGeneratedPrompts(
-      formattedData.map((shot, index) => ({
+      formattedShots.map((shot, index) => ({
         shotIndex: index,
         image_start_prompt: shot.image_start_prompt || "",
         ai_video_prompt: shot.ai_video_prompt || "",
       }))
     );
 
-    setGeneratedImages(formattedData.map(() => null));
+    setGeneratedImages(formattedShots.map(() => null));
     setGeneratingImageStates({});
-  }, [apiResponse]);
+  }, [scriptGenerated]);
 
   const handleJsonChange = (e) => {
     const newJsonString = e.target.value;
@@ -100,18 +79,17 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
     const parsedJson = JSON.parse(newJsonString);
     const formattedData = parsedJson.map((shot, index) => ({
       shot: shot.shot || (index + 1).toString(),
-      scene_description: shot.scene_description || "",
-      camera_movement: shot.camera_movement || "",
-      visual_effects: shot.visual_effects || "",
-      on_screen_text_if_need: shot.on_screen_text_if_need || "",
-      mood: shot.mood || "",
-      duration: shot.duration || "4s",
+      duration: shot.duration || "",
+      description: shot.description || "",
+      CGI_elements: shot.CGI_elements || [],
       image_start_prompt: shot.image_start_prompt || "",
       ai_video_prompt: shot.ai_video_prompt || "",
       isGenerating: shot.isGenerating || false,
       isGenerated: shot.isGenerated || false,
       generatedImage: shot.generatedImage || null,
       isGeneratingImage: shot.isGeneratingImage || false,
+      uploadedImages: shot.uploadedImages || [],
+      selectedImageIndex: shot.selectedImageIndex || 0,
     }));
     setShots(formattedData);
 
@@ -141,32 +119,35 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
   };
 
   const saveJson = () => {
-    const parsedJson = JSON.parse(jsonString);
-    const formattedData = parsedJson.map((shot, index) => ({
-      shot: shot.shot || (index + 1).toString(),
-      scene_description: shot.scene_description || "",
-      camera_movement: shot.camera_movement || "",
-      visual_effects: shot.visual_effects || "",
-      on_screen_text_if_need: shot.on_screen_text_if_need || "",
-      mood: shot.mood || "",
-      duration: shot.duration || "4s",
-      image_start_prompt: shot.image_start_prompt || "",
-      ai_video_prompt: shot.ai_video_prompt || "",
-      isGenerating: shot.isGenerating || false,
-      isGenerated: shot.isGenerated || false,
-      generatedImage: shot.generatedImage || null,
-      isGeneratingImage: shot.isGeneratingImage || false,
-    }));
-    setShots(formattedData);
+    try {
+      const parsedJson = JSON.parse(jsonString);
+      const formattedData = parsedJson.map((shot, index) => ({
+        shot: shot.shot || (index + 1).toString(),
+        duration: shot.duration || "",
+        description: shot.description || "",
+        CGI_elements: shot.CGI_elements || [],
+        image_start_prompt: shot.image_start_prompt || "",
+        ai_video_prompt: shot.ai_video_prompt || "",
+        isGenerating: shot.isGenerating || false,
+        isGenerated: shot.isGenerated || false,
+        generatedImage: shot.generatedImage || null,
+        isGeneratingImage: shot.isGeneratingImage || false,
+        uploadedImages: shot.uploadedImages || [],
+        selectedImageIndex: shot.selectedImageIndex || 0,
+      }));
+      setShots(formattedData);
 
-    const newGeneratedPrompts = formattedData.map((shot, index) => ({
-      shotIndex: index,
-      image_start_prompt: shot.image_start_prompt || "",
-      ai_video_prompt: shot.ai_video_prompt || "",
-    }));
-    setGeneratedPrompts(newGeneratedPrompts);
+      const newGeneratedPrompts = formattedData.map((shot, index) => ({
+        shotIndex: index,
+        image_start_prompt: shot.image_start_prompt || "",
+        ai_video_prompt: shot.ai_video_prompt || "",
+      }));
+      setGeneratedPrompts(newGeneratedPrompts);
 
-    setIsEditing(false);
+      setIsEditing(false);
+    } catch (error) {
+      toast.error("Invalid JSON format. Please check your input.");
+    }
   };
 
   const toggleEdit = () => {
@@ -190,22 +171,38 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
     }));
   };
 
+  const handleCGIElementChange = (index, value) => {
+    const updatedElements = [...editingShot.CGI_elements];
+    updatedElements[index] = value;
+    handleShotInputChange("CGI_elements", updatedElements);
+  };
+
+  const addCGIElement = () => {
+    const updatedElements = [...(editingShot.CGI_elements || []), ""];
+    handleShotInputChange("CGI_elements", updatedElements);
+  };
+
+  const removeCGIElement = (index) => {
+    const updatedElements = [...editingShot.CGI_elements];
+    updatedElements.splice(index, 1);
+    handleShotInputChange("CGI_elements", updatedElements);
+  };
+
   const saveShotChanges = () => {
     const newShots = [...shots];
     newShots[editingShot.index] = {
       shot: editingShot.shot,
-      scene_description: editingShot.scene_description,
-      camera_movement: editingShot.camera_movement,
-      visual_effects: editingShot.visual_effects,
-      on_screen_text_if_need: editingShot.on_screen_text_if_need,
-      mood: editingShot.mood,
       duration: editingShot.duration,
+      description: editingShot.description,
+      CGI_elements: editingShot.CGI_elements || [],
       image_start_prompt: editingShot.image_start_prompt || "",
       ai_video_prompt: editingShot.ai_video_prompt || "",
       isGenerating: editingShot.isGenerating || false,
       isGenerated: editingShot.isGenerated || false,
       generatedImage: editingShot.generatedImage || null,
       isGeneratingImage: editingShot.isGeneratingImage || false,
+      uploadedImages: editingShot.uploadedImages || [],
+      selectedImageIndex: editingShot.selectedImageIndex || 0,
     };
 
     setShots(newShots);
@@ -232,6 +229,7 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
 
     setGeneratedPrompts(updatedGeneratedPrompts);
     setEditingShot(null);
+    toast.success("Shot updated successfully!");
   };
 
   const cancelShotEdit = () => {
@@ -241,18 +239,17 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
   const addNewShot = () => {
     const newShot = {
       shot: (shots.length + 1).toString(),
-      scene_description: "",
-      camera_movement: "",
-      visual_effects: "",
-      on_screen_text_if_need: "",
-      mood: "",
-      duration: "4s",
+      duration: "",
+      description: "",
+      CGI_elements: [],
       image_start_prompt: "",
       ai_video_prompt: "",
       isGenerating: false,
       isGenerated: false,
       generatedImage: null,
       isGeneratingImage: false,
+      uploadedImages: [],
+      selectedImageIndex: 0,
     };
 
     const newShots = [...shots, newShot];
@@ -299,191 +296,318 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
       if (editingShot && editingShot.index === indexToDelete) {
         setEditingShot(null);
       }
+
+      toast.success("Shot deleted successfully!");
     }
   };
 
   const generatePromptsForAllShots = async () => {
-    if (shots.length === 0) {
-      alert("No shots available to generate prompts.");
-      return;
-    }
+    if (shots.length === 0) return;
 
     setIsGeneratingPrompts(true);
 
     try {
-      const updatingShots = shots.map((shot) => ({
+      const updatedShots = shots.map((shot) => ({
         ...shot,
         isGenerating: true,
       }));
-      setShots(updatingShots);
+      setShots(updatedShots);
 
-      const promptPromises = updatingShots.map((shot) =>
-        generateShotPrompt(shot)
-      );
-      const results = await Promise.all(promptPromises);
+      const promptPromises = updatedShots.map(async (shot, index) => {
+        const promptTemplate = PROMPT_GENERATE_IMAGE.replace(
+          "{shot}",
+          JSON.stringify(shot, null, 2)
+        );
 
-      const updatedShots = updatingShots.map((shot, index) => {
-        const result = results[index];
-        return {
-          ...shot,
-          isGenerating: false,
-          isGenerated: true,
-          image_start_prompt:
-            result.image_start_prompt || shot.image_start_prompt || "",
-          ai_video_prompt: result.ai_video_prompt || shot.ai_video_prompt || "",
-        };
+        const formData = new FormData();
+        formData.append("prompt", promptTemplate);
+        formData.append("model", "gpt-4.1");
+
+        const result = await apiPromptGenerating(formData);
+
+        if (result) {
+          let responseData = JSON.parse(result.content);
+
+          if (responseData && responseData.image_prompt) {
+            return {
+              index,
+              success: true,
+              prompt: responseData.image_prompt,
+            };
+          }
+        }
+        return { index, success: false };
       });
 
-      setShots(updatedShots);
-      setJsonString(JSON.stringify(updatedShots, null, 2));
+      const results = await Promise.all(promptPromises);
 
-      const newGeneratedPrompts = updatedShots.map((shot, index) => ({
-        shotIndex: index,
-        image_start_prompt: shot.image_start_prompt || "",
-        ai_video_prompt: shot.ai_video_prompt || "",
-      }));
+      const finalShots = [...updatedShots];
+      const newGeneratedPrompts = [...generatedPrompts];
+
+      results.forEach((result) => {
+        if (result.success) {
+          const i = result.index;
+
+          finalShots[i] = {
+            ...finalShots[i],
+            isGenerating: false,
+            isGenerated: true,
+            image_start_prompt: result.prompt,
+          };
+
+          const promptIndex = newGeneratedPrompts.findIndex(
+            (p) => p.shotIndex === i
+          );
+
+          if (promptIndex !== -1) {
+            newGeneratedPrompts[promptIndex] = {
+              ...newGeneratedPrompts[promptIndex],
+              image_start_prompt: result.prompt,
+            };
+          } else {
+            newGeneratedPrompts.push({
+              shotIndex: i,
+              image_start_prompt: result.prompt,
+              ai_video_prompt: finalShots[i].ai_video_prompt || "",
+            });
+          }
+        } else {
+          finalShots[result.index] = {
+            ...finalShots[result.index],
+            isGenerating: false,
+          };
+        }
+      });
+
+      setShots(finalShots);
       setGeneratedPrompts(newGeneratedPrompts);
+      setJsonString(JSON.stringify(finalShots, null, 2));
+
+      toast.success("All prompts generated successfully!");
     } catch (error) {
+      toast.error("Error generating prompts. Please try again.");
       const resetShots = shots.map((shot) => ({
         ...shot,
         isGenerating: false,
       }));
+
       setShots(resetShots);
     } finally {
       setIsGeneratingPrompts(false);
     }
   };
 
-  const generateImageForShot = async (shotIndex, prevImageUrl = null) => {
-    if (!shots[shotIndex].image_start_prompt) {
-      toast.error(`Shot ${shotIndex + 1} has no Image Prompt.`);
+  const generateAllImages = async () => {
+    if (shots.length === 0) return;
+
+    setIsGeneratingAllImages(true);
+    const shotsToProcess = shots.filter((shot, index) => {
+      if (!shot.image_start_prompt) return false;
+
+      const existingImages = [
+        ...(shot.generatedImage ? [shot.generatedImage] : []),
+        ...(generatedImages[index] ? [generatedImages[index]] : []),
+        ...(shot.uploadedImages || []),
+      ].filter(Boolean);
+
+      return existingImages.length < 3;
+    });
+
+    if (shotsToProcess.length === 0) {
+      toast.info(
+        "No shots need images generated (all shots either have 3 images already or no prompt)"
+      );
+      setIsGeneratingAllImages(false);
       return;
     }
 
+    toast.info(`Generating images for ${shotsToProcess.length} shots...`);
+
+    // Thiết lập trạng thái đang tạo ảnh cho tất cả các shot cần xử lý
+    const newGeneratingStates = {};
+    shotsToProcess.forEach((shot) => {
+      const shotIndex = shots.indexOf(shot);
+      newGeneratingStates[shotIndex] = true;
+    });
+    setGeneratingImageStates((prev) => ({
+      ...prev,
+      ...newGeneratingStates,
+    }));
+
     try {
-      const updatingShots = [...shots];
-      updatingShots[shotIndex] = {
-        ...updatingShots[shotIndex],
-        isGeneratingImage: true,
-      };
+      const generatePromises = shotsToProcess.map(async (shot) => {
+        const shotIndex = shots.indexOf(shot);
 
-      const formData = new FormData();
-      const inputImage = shotIndex === 0 ? sourceImage : prevImageUrl;
+        try {
+          const payload = {
+            prompt: shot.image_start_prompt,
+            size: "1024x1536",
+            model: "gpt-image-1",
+            quality: "medium",
+            background: "auto",
+            output_format: "png",
+            output_compression: 0,
+          };
 
-      if (!inputImage) {
-        throw new Error("No source image to create the shot.");
-      }
+          const result = await generate(payload);
 
-      if (typeof inputImage === "string" && inputImage.startsWith("http")) {
-        const response = await fetch(inputImage);
-        const blob = await response.blob();
-        formData.append("image", blob, "previous_image.jpg");
-      } else if (inputImage instanceof File) {
-        formData.append("image", inputImage);
-      } else {
-        formData.append("image", inputImage);
-      }
+          return {
+            shotIndex,
+            success: true,
+            imageUrl: result?.imageUrl || result?.image_url,
+            error: null,
+          };
+        } catch (error) {
+          return {
+            shotIndex,
+            success: false,
+            imageUrl: null,
+            error,
+          };
+        }
+      });
 
-      formData.append("prompt", shots[shotIndex].image_start_prompt);
+      const results = await Promise.all(generatePromises);
+      const updatedShots = [...shots];
+      const newGeneratedImages = [...generatedImages];
 
-      const result = await apiEditImage(formData);
+      results.forEach((result) => {
+        const { shotIndex, success, imageUrl, error } = result;
 
-      if (!result || !result.image_url) {
-        throw new Error("No image URL received from API.");
-      }
+        if (success && imageUrl) {
+          if (!updatedShots[shotIndex].generatedImage) {
+            updatedShots[shotIndex] = {
+              ...updatedShots[shotIndex],
+              generatedImage: imageUrl,
+              selectedImageIndex: 0,
+            };
+          } else {
+            newGeneratedImages[shotIndex] = imageUrl;
 
-      updatingShots[shotIndex] = {
-        ...updatingShots[shotIndex],
-        isGeneratingImage: false,
-        generatedImage: result.image_url,
-      };
-      setShots(updatingShots);
+            const existingImages = [
+              updatedShots[shotIndex].generatedImage,
+              ...(updatedShots[shotIndex].uploadedImages || []),
+            ].filter(Boolean);
 
-      return result.image_url;
+            updatedShots[shotIndex] = {
+              ...updatedShots[shotIndex],
+              selectedImageIndex: existingImages.length,
+            };
+          }
+
+          toast.success(`Generated image for Shot ${shotIndex + 1}`);
+        } else {
+          toast.error(`Failed to generate image for Shot ${shotIndex + 1}`);
+        }
+      });
+
+      setGeneratedImages(newGeneratedImages);
+      setShots(updatedShots);
+      setJsonString(JSON.stringify(updatedShots, null, 2));
+
+      toast.success("All image generation processes completed!");
     } catch (error) {
-      toast.error(
-        `Error generating image for shot ${shotIndex + 1}: ${error.message}`
-      );
+      toast.error("Error generating images. Please try again.");
+    } finally {
+      const resetStates = {};
+      shotsToProcess.forEach((shot) => {
+        const shotIndex = shots.indexOf(shot);
+        resetStates[shotIndex] = false;
+      });
 
-      const updatingShots = [...shots];
-      updatingShots[shotIndex] = {
-        ...updatingShots[shotIndex],
-        isGeneratingImage: false,
-      };
-      setShots(updatingShots);
+      setGeneratingImageStates((prev) => ({
+        ...prev,
+        ...resetStates,
+      }));
 
-      return null;
+      setIsGeneratingAllImages(false);
     }
   };
 
-  const generateAllImages = async () => {
-    if (!sourceImage) {
-      toast.error("No source image to start generating images.");
+  const handleUploadImage = (shotIndex, uploadedImages) => {
+    const updatedShots = [...shots];
+    updatedShots[shotIndex] = {
+      ...updatedShots[shotIndex],
+      uploadedImages,
+    };
+
+    setShots(updatedShots);
+    setJsonString(JSON.stringify(updatedShots, null, 2));
+  };
+
+  const handleSelectImage = (shotIndex, imageIndex) => {
+    const updatedShots = [...shots];
+    updatedShots[shotIndex] = {
+      ...updatedShots[shotIndex],
+      selectedImageIndex: imageIndex,
+    };
+
+    setShots(updatedShots);
+    setJsonString(JSON.stringify(updatedShots, null, 2));
+  };
+
+  const handleGenerateImage = async (shotIndex) => {
+    const shot = shots[shotIndex];
+    const existingImages = [
+      ...(shot.generatedImage ? [shot.generatedImage] : []),
+      ...(generatedImages[shotIndex] ? [generatedImages[shotIndex]] : []),
+      ...(shot.uploadedImages || []),
+    ].filter(Boolean);
+
+    if (existingImages.length >= 3) {
+      toast.error("Maximum of 3 images allowed per shot");
       return;
     }
 
-    if (shots.length === 0) {
-      toast.error("No shots available to generate images.");
-      return;
-    }
+    setGeneratingImageStates((prev) => ({
+      ...prev,
+      [shotIndex]: true,
+    }));
 
     try {
-      setIsGeneratingAllImages(true);
-      const newGeneratedImages = [...generatedImages];
-      let previousImageUrl = null;
+      const payload = {
+        prompt: shot.image_start_prompt,
+        size: "1024x1536",
+        model: "gpt-image-1",
+        quality: "medium",
+        background: "auto",
+        output_format: "png",
+        output_compression: 0,
+      };
+      const result = await generate(payload);
 
-      for (let i = 0; i < shots.length; i++) {
-        if (!shots[i].image_start_prompt) {
-          toast.warning(`Shot ${i + 1} has no Image Prompt, skipping.`);
-          continue;
+      if (result && result.image_url) {
+        const updatedShots = JSON.parse(JSON.stringify(shots));
+        const newGeneratedImagesArray = [...generatedImages];
+        if (!updatedShots[shotIndex].generatedImage) {
+          updatedShots[shotIndex] = {
+            ...updatedShots[shotIndex],
+            generatedImage: result.image_url,
+            selectedImageIndex: 0,
+          };
+        } else {
+          newGeneratedImagesArray[shotIndex] = result.image_url;
+          updatedShots[shotIndex] = {
+            ...updatedShots[shotIndex],
+            selectedImageIndex: existingImages.length,
+          };
         }
 
-        const inputImage = i === 0 ? sourceImage : previousImageUrl;
+        setGeneratedImages(newGeneratedImagesArray);
+        setShots(updatedShots);
+        setJsonString(JSON.stringify(updatedShots, null, 2));
 
-        if (!inputImage) {
-          toast.error(
-            `Cannot generate image for Shot ${
-              i + 1
-            } because there is no input image.`
-          );
-          break;
-        }
-
-        setGeneratingImageStates((prev) => ({
-          ...prev,
-          [i]: true,
-        }));
-
-        try {
-          const result = await generateImageForShot(i, inputImage);
-          if (result) {
-            newGeneratedImages[i] = result;
-            setGeneratedImages([...newGeneratedImages]);
-
-            const updatedShots = [...shots];
-            updatedShots[i] = {
-              ...updatedShots[i],
-              generatedImage: result,
-            };
-            setShots(updatedShots);
-
-            previousImageUrl = result;
-          } else {
-            toast.error(`Unable to generate image for Shot ${i + 1}.`);
-          }
-        } finally {
-          setGeneratingImageStates((prev) => ({
-            ...prev,
-            [i]: false,
-          }));
-        }
+        toast.success("Image generated successfully!");
+      } else {
+        toast.error("Failed to generate image");
       }
-
-      toast.success("All images have been generated!");
     } catch (error) {
-      toast.error("Error generating images for shots.");
+      toast.error("Error generating image. Please try again.");
     } finally {
-      setIsGeneratingAllImages(false);
+      setGeneratingImageStates((prev) => ({
+        ...prev,
+        [shotIndex]: false,
+      }));
     }
   };
 
@@ -524,16 +648,16 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
           </Button>
 
           <Button
-            onClick={generateAllImages}
+            onClick={() => generateAllImages()}
             variant="default"
             size="sm"
             className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
-            disabled={
-              isGeneratingAllImages || !sourceImage || shots.length === 0
-            }
+            disabled={isGeneratingAllImages || shots.length === 0}
           >
             <ImageIcon size={14} />
-            {isGeneratingAllImages ? "Generating images..." : "Generate images"}
+            {isGeneratingAllImages
+              ? "Generating images..."
+              : "Generate all images"}
           </Button>
         </div>
       </div>
@@ -620,7 +744,7 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Duration (seconds)
+                            Duration
                           </label>
                           <input
                             type="text"
@@ -635,86 +759,53 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
 
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Scene Description
+                          Description
                         </label>
                         <textarea
-                          value={editingShot.scene_description}
+                          value={editingShot.description}
                           onChange={(e) =>
-                            handleShotInputChange(
-                              "scene_description",
-                              e.target.value
-                            )
+                            handleShotInputChange("description", e.target.value)
                           }
                           className="w-full p-2 border border-gray-300 rounded-md text-sm"
                           rows={2}
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Camera Movement
-                          </label>
-                          <input
-                            type="text"
-                            value={editingShot.camera_movement}
-                            onChange={(e) =>
-                              handleShotInputChange(
-                                "camera_movement",
-                                e.target.value
-                              )
-                            }
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Visual Effects
-                          </label>
-                          <input
-                            type="text"
-                            value={editingShot.visual_effects}
-                            onChange={(e) =>
-                              handleShotInputChange(
-                                "visual_effects",
-                                e.target.value
-                              )
-                            }
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            On-Screen Text
-                          </label>
-                          <input
-                            type="text"
-                            value={editingShot.on_screen_text_if_need}
-                            onChange={(e) =>
-                              handleShotInputChange(
-                                "on_screen_text_if_need",
-                                e.target.value
-                              )
-                            }
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Mood
-                          </label>
-                          <input
-                            type="text"
-                            value={editingShot.mood}
-                            onChange={(e) =>
-                              handleShotInputChange("mood", e.target.value)
-                            }
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                          />
-                        </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          CGI Elements
+                        </label>
+                        {(editingShot.CGI_elements || []).map(
+                          (element, idx) => (
+                            <div key={idx} className="flex mb-2">
+                              <input
+                                type="text"
+                                value={element}
+                                onChange={(e) =>
+                                  handleCGIElementChange(idx, e.target.value)
+                                }
+                                className="flex-grow p-2 border border-gray-300 rounded-md text-sm mr-2"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-500"
+                                onClick={() => removeCGIElement(idx)}
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            </div>
+                          )
+                        )}
+                        <Button
+                          onClick={addCGIElement}
+                          variant="outline"
+                          size="sm"
+                          className="mt-1"
+                        >
+                          <PlusCircle size={14} className="mr-1" />
+                          Add CGI Element
+                        </Button>
                       </div>
 
                       <div className="border-t border-gray-200 pt-3 mt-3">
@@ -776,162 +867,42 @@ const ScriptGenerated = ({ apiResponse, sourceImage }) => {
                         </div>
                         <div className="md:col-span-2">
                           <div className="text-xs font-medium text-gray-500">
-                            Scene Description:
+                            Description:
                           </div>
-                          <div className="font-medium">
-                            {shot.scene_description}
-                          </div>
+                          <div className="font-medium">{shot.description}</div>
                         </div>
-                        <div>
+                        <div className="md:col-span-2">
                           <div className="text-xs font-medium text-gray-500">
-                            Camera Movement:
+                            CGI Elements:
                           </div>
-                          <div className="font-medium">
-                            {shot.camera_movement}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-gray-500">
-                            Visual Effects:
-                          </div>
-                          <div className="font-medium">
-                            {shot.visual_effects}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-gray-500">
-                            On-Screen Text:
-                          </div>
-                          <div className="font-medium">
-                            {shot.on_screen_text_if_need}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs font-medium text-gray-500">
-                            Mood:
-                          </div>
-                          <div className="font-medium">{shot.mood}</div>
+                          {shot.CGI_elements && shot.CGI_elements.length > 0 ? (
+                            <ul className="list-disc pl-5">
+                              {shot.CGI_elements.map((element, idx) => (
+                                <li key={idx} className="font-medium">
+                                  {element}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="font-medium text-gray-400">
+                              No CGI elements
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      <div className="mt-3 border-t border-gray-200 pt-3">
-                        <div className="mb-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <ImageIcon size={14} className="mr-1" />
-                              <div className="text-xs font-medium text-gray-500">
-                                Image Prompt:
-                              </div>
-                            </div>
-                            <Button
-                              onClick={() => copyPrompt(index, "image")}
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs"
-                            >
-                              {copiedPromptInfo.index === index &&
-                              copiedPromptInfo.type === "image" ? (
-                                <Check size={12} className="mr-1" />
-                              ) : (
-                                <Copy size={12} className="mr-1" />
-                              )}
-                              Copy
-                            </Button>
-                          </div>
-                          <div className="text-sm mt-1 bg-gray-50 p-2 rounded">
-                            {shot.image_start_prompt || "Not generated"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <Film size={14} className="mr-1" />
-                              <div className="text-xs font-medium text-gray-500">
-                                Video Prompt:
-                              </div>
-                            </div>
-                            <Button
-                              onClick={() => copyPrompt(index, "video")}
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs"
-                            >
-                              {copiedPromptInfo.index === index &&
-                              copiedPromptInfo.type === "video" ? (
-                                <Check size={12} className="mr-1" />
-                              ) : (
-                                <Copy size={12} className="mr-1" />
-                              )}
-                              Copy
-                            </Button>
-                          </div>
-                          <div className="text-sm mt-1 bg-gray-50 p-2 rounded">
-                            {shot.ai_video_prompt || "Not generated"}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 border-t border-gray-200 pt-3">
-                        <div className="flex items-center mb-2">
-                          <ImageIcon size={14} className="mr-1" />
-                          <div className="text-xs font-medium text-gray-500">
-                            Generated Image:
-                          </div>
-                        </div>
-
-                        {generatingImageStates[index] ? (
-                          <div className="flex items-center justify-center h-40 bg-gray-50 rounded">
-                            <div className="flex flex-col items-center">
-                              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                              <p className="mt-2 text-sm text-gray-500">
-                                Generating image...
-                              </p>
-                            </div>
-                          </div>
-                        ) : generatedImages[index] ? (
-                          <div className="relative h-64 bg-gray-50 rounded overflow-hidden">
-                            <img
-                              src={generatedImages[index]}
-                              alt={`Generated image for Shot ${index + 1}`}
-                              className="w-full h-full object-contain"
-                              style={{
-                                border: "1px solid #ddd",
-                                backgroundColor: "#f8f9fa",
-                              }}
-                            />
-                            <div className="absolute bottom-2 right-2 bg-white bg-opacity-80 rounded px-2 py-1 text-xs">
-                              <a
-                                href={generatedImages[index]}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
-                                Open in new tab
-                              </a>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center h-40 bg-gray-50 rounded border border-dashed border-gray-300">
-                            <p className="text-sm text-gray-500">
-                              No image generated for this shot
-                            </p>
-                          </div>
-                        )}
-
-                        {generatedImages[index] && (
-                          <div className="mt-2 text-xs">
-                            <span className="text-gray-600">Image URL: </span>
-                            <a
-                              href={generatedImages[index]}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 break-all hover:underline"
-                            >
-                              {generatedImages[index]}
-                            </a>
-                          </div>
-                        )}
-                      </div>
+                      {/* Use the ImageGenerated component here */}
+                      <ImageGenerated
+                        shot={shot}
+                        index={index}
+                        generatingImageStates={generatingImageStates}
+                        generatedImages={generatedImages}
+                        copyPrompt={copyPrompt}
+                        copiedPromptInfo={copiedPromptInfo}
+                        onGenerateImage={handleGenerateImage}
+                        onUploadImage={handleUploadImage}
+                        onSelectImage={handleSelectImage}
+                      />
                     </>
                   )}
                 </div>
