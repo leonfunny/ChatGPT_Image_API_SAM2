@@ -1,15 +1,23 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { uploadImageToLeonardo } from "@/services/upload";
+import {
+  checkLeonardoStatus,
+  generateImageToVideo,
+} from "@/services/generate-video";
 
 const LeonardoImageToVideo = () => {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [error, setError] = useState(null);
+  const [prompt, setPrompt] = useState("");
+  const [generationId, setGenerationId] = useState(null);
+  const [statusCheckInterval, setStatusCheckInterval] = useState(null);
 
   const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles && acceptedFiles.length > 0) {
@@ -21,6 +29,7 @@ const LeonardoImageToVideo = () => {
 
       setUploadResult(null);
       setError(null);
+      setGenerationId(null);
     }
   }, []);
 
@@ -34,36 +43,126 @@ const LeonardoImageToVideo = () => {
   });
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || !prompt.trim()) {
+      setError("Please provide both an image and a prompt");
+      return;
+    }
 
     setIsUploading(true);
     setError(null);
 
     try {
+      // Step 1: Upload image to Leonardo
       const formData = new FormData();
       formData.append("image", file);
 
-      const response = await uploadImageToLeonardo(formData);
+      const uploadResponse = await uploadImageToLeonardo(formData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Upload failed");
+      const imageId = uploadResponse.uploadInitImage?.id;
+
+      if (!imageId) {
+        throw new Error("Failed to get image ID from upload response");
       }
 
-      const result = await response.json();
-      setUploadResult(result);
+      setIsProcessing(true);
+      const generationResponse = await generateImageToVideo(
+        JSON.stringify({
+          image_type: "UPLOADED",
+          image_id: imageId,
+          prompt: prompt,
+          frame_interpolation: true,
+          prompt_enhance: true,
+        })
+      );
+
+      if (!generationResponse.ok) {
+        const errorData = await generationResponse.json();
+        throw new Error(errorData.detail || "Video generation failed");
+      }
+
+      const generationData = await generationResponse.json();
+      const newGenerationId = generationData.generation_id;
+
+      if (!newGenerationId) {
+        throw new Error("Failed to get generation ID");
+      }
+
+      setGenerationId(newGenerationId);
+
+      // Start polling for status
+      startStatusChecking(newGenerationId);
     } catch (err) {
-      setError(err.message || "An error occurred during upload");
-    } finally {
+      setError(err.message || "An error occurred during process");
       setIsUploading(false);
+      setIsProcessing(false);
     }
   };
+
+  const startStatusChecking = (id) => {
+    // Clear any existing interval
+    if (statusCheckInterval) {
+      clearInterval(statusCheckInterval);
+    }
+
+    // Set new interval for status checking
+    const interval = setInterval(async () => {
+      try {
+        const statusResponse = await checkLeonardoStatus(id);
+
+        if (!statusResponse.ok) {
+          throw new Error("Failed to check status");
+        }
+
+        const statusData = await statusResponse.json();
+
+        // If complete, update the result and stop checking
+        if (statusData.status === "COMPLETE" && statusData.video_url) {
+          setUploadResult({
+            id: id,
+            video_url: statusData.video_url,
+          });
+          setIsUploading(false);
+          setIsProcessing(false);
+          clearInterval(interval);
+          setStatusCheckInterval(null);
+        } else if (statusData.status === "FAILED") {
+          throw new Error("Video generation failed");
+        }
+        // Otherwise continue polling
+      } catch (err) {
+        setError(err.message || "Error checking generation status");
+        setIsUploading(false);
+        setIsProcessing(false);
+        clearInterval(interval);
+        setStatusCheckInterval(null);
+      }
+    }, 5000); // Check every 5 seconds
+
+    setStatusCheckInterval(interval);
+  };
+
+  // Clean up interval on component unmount
+  useEffect(() => {
+    return () => {
+      if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+      }
+    };
+  }, [statusCheckInterval]);
 
   const clearUpload = () => {
     setFile(null);
     setPreview(null);
     setUploadResult(null);
     setError(null);
+    setPrompt("");
+    setGenerationId(null);
+
+    // Clear any active status checking
+    if (statusCheckInterval) {
+      clearInterval(statusCheckInterval);
+      setStatusCheckInterval(null);
+    }
 
     // Revoke the object URL to avoid memory leaks
     if (preview) {
@@ -115,19 +214,45 @@ const LeonardoImageToVideo = () => {
         </div>
       </div>
 
+      {/* Prompt input field */}
+      <div className="mb-6">
+        <label
+          htmlFor="prompt"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Video Generation Prompt
+        </label>
+        <textarea
+          id="prompt"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Describe how you want the image to be animated..."
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          rows={3}
+          disabled={isUploading || isProcessing}
+        ></textarea>
+        <p className="mt-1 text-sm text-gray-500">
+          Be descriptive about the motion and style you want in your video
+        </p>
+      </div>
+
       {file && (
         <div className="flex space-x-4 mb-6">
           <Button
             onClick={handleUpload}
-            disabled={isUploading}
+            disabled={isUploading || isProcessing || !prompt.trim()}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isUploading ? "Uploading..." : "Generate Video"}
+            {isUploading
+              ? "Uploading..."
+              : isProcessing
+              ? "Processing..."
+              : "Generate Video"}
           </Button>
 
           <Button
             onClick={clearUpload}
-            disabled={isUploading}
+            disabled={isUploading || isProcessing}
             className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Clear
@@ -138,6 +263,24 @@ const LeonardoImageToVideo = () => {
       {error && (
         <div className="p-4 mb-6 bg-red-50 border border-red-200 rounded-md">
           <p className="text-red-600">{error}</p>
+        </div>
+      )}
+
+      {isProcessing && generationId && !uploadResult && (
+        <div className="p-4 mb-6 bg-blue-50 border border-blue-200 rounded-md">
+          <h3 className="text-lg font-medium text-blue-800 mb-2">
+            Processing Your Video
+          </h3>
+          <p className="text-blue-600">
+            Please wait while Leonardo AI creates your video. This may take a
+            few minutes.
+          </p>
+          <p className="mt-2 text-sm">
+            <span className="font-medium">Generation ID:</span> {generationId}
+          </p>
+          <div className="mt-4 w-full h-2 bg-blue-100 overflow-hidden rounded-full">
+            <div className="h-full bg-blue-500 animate-pulse"></div>
+          </div>
         </div>
       )}
 
@@ -165,8 +308,6 @@ const LeonardoImageToVideo = () => {
               <span className="font-medium">Video ID:</span> {uploadResult.id}
             </p>
           )}
-
-          {/* Add any other result fields you want to display */}
         </div>
       )}
     </div>

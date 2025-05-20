@@ -15,6 +15,7 @@ export const HOST = {
   uploadVideo: "upload-video",
   generateVideo: "generate/video",
   generateTextToVideo: "generate/text-to-video",
+  generateImageToVideo: "generate/image-to-video",
   promptGenerating: "picture-ads/prompt-generating",
   pictureAdsGenerate: "picture-ads/edit",
   pictureAdsMergeGenerate: "picture-ads/edit-merge",

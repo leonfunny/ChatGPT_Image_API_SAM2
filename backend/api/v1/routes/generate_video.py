@@ -2,6 +2,7 @@ import uuid
 from api.v1.schemas.video import (
     GenerateVideoRequest,
     GenerationLeonardoResponse,
+    ImageToVideoRequest,
     VideoGenerationRequest,
     VideoResponse,
 )
@@ -252,30 +253,29 @@ async def upload_to_leonardo(
     return response.json()
 
 
-# @router.post("/image-to-video", response_model=ImageToVideoResponse)
-# async def generate_image_to_video(
-#     request: ImageToVideoRequest,
-#     leonardo_service: LeonardoService = Depends(get_leonardo_service),
-# ):
-#     try:
-#         result = await leonardo_service.image_to_video_from_url(
-#             image_url=str(request.image_url),
-#             prompt=request.prompt,
-#             frame_interpolation=request.frame_interpolation,
-#             is_public=request.is_public,
-#             prompt_enhance=request.prompt_enhance,
-#         )
+@router.post("/image-to-video", response_model=GenerationLeonardoResponse)
+async def generate_image_to_video(
+    request: ImageToVideoRequest,
+    client: httpx.AsyncClient = Depends(get_http_client),
+):
+    payload = {
+        "imageType": request.image_type,
+        "imageId": request.image_id,
+        "prompt": request.prompt,
+        "frameInterpolation": request.frame_interpolation,
+        "isPublic": False,
+        "promptEnhance": request.prompt_enhance,
+    }
 
-#         return ImageToVideoResponse(
-#             generation_id=result["generation_id"],
-#             status=result["status"],
-#             message=result.get("message"),
-#             image_id=result.get("image_id"),
-#         )
+    response = await call_leonardo_api(
+        client, "generations-image-to-video", "POST", payload
+    )
 
-#     except Exception as e:
-#         if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
-#             raise HTTPException(
-#                 status_code=429, detail="Rate limit exceeded. Please try again later."
-#             )
-#         raise HTTPException(status_code=500, detail=str(e))
+    generation_id = response.get("motionVideoGenerationJob", {}).get("generationId")
+
+    if not generation_id:
+        raise HTTPException(
+            status_code=500, detail="Failed to get generation ID from Leonardo.ai"
+        )
+
+    return GenerationLeonardoResponse(generation_id=generation_id, status="pending")

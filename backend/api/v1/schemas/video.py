@@ -45,10 +45,10 @@ class GenerationLeonardoResponse(GeneralModel):
 
 
 class ImageToVideoRequest(GeneralModel):
-    image_url: str
+    image_type: str
+    image_id: str
     prompt: str
     frame_interpolation: Optional[bool]
-    is_public: Optional[bool]
     prompt_enhance: Optional[bool]
 
 

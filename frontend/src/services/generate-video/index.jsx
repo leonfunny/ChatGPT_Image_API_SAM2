@@ -28,6 +28,14 @@ const generateTextToVideo = async (payload) => {
   });
   return response;
 };
+const generateImageToVideo = async (payload) => {
+  const response = await Request({
+    method: HTTP_METHOD.POST,
+    url: HOST.generateImageToVideo,
+    data: payload,
+  });
+  return response;
+};
 
 const checkLeonardoStatus = async (requestId) => {
   const response = await Request({
@@ -36,4 +44,10 @@ const checkLeonardoStatus = async (requestId) => {
   });
   return response;
 };
-export { generateVideo, checkStatus, generateTextToVideo, checkLeonardoStatus };
+export {
+  generateVideo,
+  checkStatus,
+  generateTextToVideo,
+  checkLeonardoStatus,
+  generateImageToVideo,
+};
