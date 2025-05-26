@@ -83,12 +83,7 @@ const MultipleImageUpload = ({
             </div>
           </div>
         ))}
-        <div
-          className="flex flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/50 p-4 h-24 cursor-pointer hover:bg-accent/50 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation(); // Prevent triggering the dropzone
-          }}
-        >
+        <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/50 p-4 h-24 cursor-pointer hover:bg-accent/50 transition-colors">
           <Plus className="h-8 w-8 text-muted-foreground mb-1" />
           <p className="text-xs text-muted-foreground text-center">
             Add Images
